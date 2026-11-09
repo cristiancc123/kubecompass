@@ -12,4 +12,4 @@ resources:
 images:
   - name: app
     newName: ghcr.io/cristiancc123/kubecompass
-    newTag: 3d4263b
+    newTag: 8487b4b
