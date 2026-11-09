@@ -9,8 +9,8 @@ export interface Config {
   sessionsIndex: string;
 }
 
-function required(name: string): string {
-  const value = process.env[name];
+function required(env: NodeJS.ProcessEnv, name: string): string {
+  const value = env[name];
   if (!value) {
     throw new Error(`Missing required environment variable ${name}`);
   }
@@ -20,8 +20,8 @@ function required(name: string): string {
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     port: Number(env.PORT ?? 3000),
-    elasticsearchUrl: required("ELASTICSEARCH_URL"),
-    elasticsearchApiKey: required("ELASTICSEARCH_API_KEY"),
+    elasticsearchUrl: required(env, "ELASTICSEARCH_URL"),
+    elasticsearchApiKey: required(env, "ELASTICSEARCH_API_KEY"),
     sessionsIndex: env.SESSIONS_INDEX ?? "kubecon-sessions",
   };
 }

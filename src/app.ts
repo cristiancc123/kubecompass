@@ -2,6 +2,7 @@ import { Hono } from "hono";
 
 /** The slice of the search backend the HTTP layer depends on. */
 export interface SearchBackend {
+  /** Resolves to false (or throws) when Elasticsearch cannot be reached. */
   ping(): Promise<boolean>;
 }
 
@@ -20,7 +21,10 @@ export function createApp(deps: AppDependencies): Hono {
 
   app.get("/readyz", async (c) => {
     try {
-      await deps.es.ping();
+      const reachable = await deps.es.ping();
+      if (!reachable) {
+        return c.json({ status: "degraded", elasticsearch: "unreachable" }, 503);
+      }
       return c.json({ status: "ok", elasticsearch: "reachable" });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
