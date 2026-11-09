@@ -111,7 +111,7 @@ export function renderPage({ query, result, error }: PageModel): string {
   const content = `<form method="get" action="/" role="search">
       <div class="row">
         <label for="q">What are you looking for?
-          <input id="q" name="q" type="search" maxlength="300" placeholder="something on eBPF and security after lunch" value="${escapeHtml(query.q)}" autofocus />
+          <input id="q" name="q" type="search" maxlength="300" placeholder="something on eBPF and security after lunch" value="${escapeHtml(query.q)}" />
         </label>
         <button type="submit">Search</button>
       </div>
@@ -122,7 +122,7 @@ export function renderPage({ query, result, error }: PageModel): string {
         <label for="venue">Venue<select id="venue" name="venue"><option value="">Any venue</option>${renderOptions(facets.venue, query.venue, (v) => v)}</select></label>
       </div>
     </form>
-    <section id="results" aria-live="polite">${body}</section>`;
+    <section id="results" tabindex="-1" aria-live="polite">${body}</section>`;
 
   return renderLayout({
     title: "kubecompass · find the right talk at KubeCon",
@@ -162,12 +162,14 @@ export function renderLayout(page: LayoutModel): string {
   <title>${escapeHtml(page.title)}</title>
   <meta name="description" content="${escapeHtml(page.description)}" />
   <style>
-    :root { --bg: #0b1020; --panel: #121a2f; --text: #e8ecf5; --muted: #a9b3c9; --accent: #5ad1ff; --accent-2: #a78bfa; --on-accent: #041018; --error: #fca5a5; --border: #27324d; }
-    @media (prefers-color-scheme: light) { :root { --bg: #f7f8fb; --panel: #ffffff; --text: #111827; --muted: #4b5563; --accent: #0369a1; --accent-2: #6d28d9; --on-accent: #ffffff; --error: #b91c1c; --border: #d7dce6; } }
+    :root { --bg: #0b1020; --panel: #121a2f; --text: #e8ecf5; --muted: #a9b3c9; --accent: #5ad1ff; --accent-2: #a78bfa; --on-accent: #041018; --error: #fca5a5; --border: #27324d; --control-border: #6b7a99; }
+    @media (prefers-color-scheme: light) { :root { --bg: #f7f8fb; --panel: #ffffff; --text: #111827; --muted: #4b5563; --accent: #0369a1; --accent-2: #6d28d9; --on-accent: #ffffff; --error: #b91c1c; --border: #d7dce6; --control-border: #7c8698; } }
     * { box-sizing: border-box; }
     body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
     a { color: var(--accent); }
     a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 2px; }
+    /* Skip-link targets take focus so screen readers continue from there; no ring on a whole region. */
+    [tabindex="-1"]:focus { outline: none; }
     .skip { position: absolute; left: -999px; } .skip:focus { left: 16px; top: 8px; background: var(--panel); padding: 8px; }
     header, main { max-width: 960px; margin: 0 auto; padding: 0 16px; }
     header { padding-top: 32px; }
@@ -177,7 +179,7 @@ export function renderLayout(page: LayoutModel): string {
     .row { display: grid; gap: 12px; grid-template-columns: 1fr auto; align-items: end; }
     .filters { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
     label { display: grid; gap: 4px; font-size: 0.9rem; color: var(--muted); }
-    input, select, button { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+    input, select, button { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--control-border); background: var(--bg); color: var(--text); }
     button { background: var(--accent); color: var(--on-accent); border-color: transparent; font-weight: 600; cursor: pointer; }
     .summary, .empty, .error { margin: 24px 0 12px; color: var(--muted); }
     .error { color: var(--error); }
@@ -192,7 +194,7 @@ export function renderLayout(page: LayoutModel): string {
     nav { display: flex; gap: 16px; margin: 8px 0 0; }
     nav a { font-weight: 600; text-decoration: none; padding: 2px 0; }
     nav a[aria-current="page"] { text-decoration: underline; text-underline-offset: 6px; text-decoration-thickness: 2px; }
-    textarea { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); min-height: 7rem; resize: vertical; }
+    textarea { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--control-border); background: var(--bg); color: var(--text); min-height: 7rem; resize: vertical; }
     textarea:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 2px; }
     .hint { font-size: 0.85rem; color: var(--muted); margin: 0; }
     .notice { background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; padding: 12px 16px; margin: 0 0 16px; }
@@ -201,7 +203,7 @@ export function renderLayout(page: LayoutModel): string {
     .answer { margin: 24px 0 0; } .answer .desc { margin: 0; font-size: 1.05rem; }
     .ref { font-weight: 600; text-decoration: none; }
     button:disabled, input:disabled { opacity: 0.6; cursor: not-allowed; }
-    button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    button.secondary { background: transparent; color: var(--text); border: 1px solid var(--control-border); }
   </style>
 </head>
 <body>

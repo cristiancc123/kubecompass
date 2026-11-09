@@ -36,7 +36,10 @@
   },
   "devDependencies": {
     "@opentelemetry/context-async-hooks": "^3.1.1",
+    "@types/jsdom": "^30.0.0",
     "@types/node": "^24.0.0",
+    "axe-core": "^4.14.0",
+    "jsdom": "^29.1.1",
     "tsx": "^4.19.0",
     "typescript": "^5.8.0",
     "vitest": "^3.1.0"
