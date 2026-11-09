@@ -79,11 +79,14 @@ spec:
             limits:
               cpu: 500m
               memory: 256Mi
+          # /readyz answers from a cached background check, so the probe never
+          # waits on Elasticsearch; the timeout is headroom for event-loop pauses.
           readinessProbe:
             httpGet:
               path: /readyz
               port: http
             periodSeconds: 5
+            timeoutSeconds: 2
           livenessProbe:
             httpGet:
               path: /healthz

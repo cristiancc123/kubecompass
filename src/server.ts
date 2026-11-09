@@ -6,6 +6,7 @@ import { loadConfig } from "./config.js";
 import { createElasticsearchClient } from "./es.js";
 import { log } from "./log.js";
 import { createPeopleBackend } from "./people.js";
+import { createReadinessMonitor } from "./readiness.js";
 import { createSearchBackend } from "./search.js";
 import { startTelemetry } from "./telemetry.js";
 
@@ -23,8 +24,11 @@ const ask = config.ask
       ),
     )
   : undefined;
+const readiness = createReadinessMonitor(() => search.ping());
+const stopReadiness = readiness.start();
 const app = createApp({
   search,
+  readiness,
   ask,
   askLimiter: config.ask ? createRateLimiter(config.ask.limitPerMinute, 60_000) : undefined,
   people: createPeopleBackend(es, config.attendeesIndex),
@@ -41,6 +45,7 @@ const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
 // Kubernetes sends SIGTERM before it kills the pod: stop taking requests,
 // then flush the telemetry still buffered.
 process.once("SIGTERM", () => {
+  stopReadiness();
   server.close(() => {
     stopTelemetry().finally(() => process.exit(0));
   });

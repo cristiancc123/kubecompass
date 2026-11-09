@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { buildMatchRequest, isAttendeeId, parseAttendeeInput } from "../src/people.js";
 import type { SearchBackend } from "../src/search.js";
-import { fakePeople, SAMPLE_ID, sampleAttendee } from "./fakes.js";
+import { fakePeople, SAMPLE_ID, sampleAttendee, alwaysReady } from "./fakes.js";
 
 const search: SearchBackend = {
   ping: async () => true,
@@ -81,7 +81,7 @@ describe("isAttendeeId", () => {
 
 describe("hallway track routes", () => {
   it("renders the sign-up form with labelled fields", async () => {
-    const res = await createApp({ search, people: fakePeople() }).request("/people");
+    const res = await createApp({ search, people: fakePeople(), readiness: alwaysReady }).request("/people");
     expect(res.status).toBe(200);
     const html = await res.text();
     for (const id of ["name", "interests", "contact"]) {
@@ -92,7 +92,7 @@ describe("hallway track routes", () => {
 
   it("creates a profile and redirects to it", async () => {
     const createAttendee = vi.fn(async () => sampleAttendee());
-    const app = createApp({ search, people: fakePeople({ createAttendee }) });
+    const app = createApp({ search, people: fakePeople({ createAttendee }), readiness: alwaysReady });
     const res = await app.request(
       "/people",
       form({ name: "Ana", interests: "GPU scheduling with Kueue", contact: "@ana" }),
@@ -107,7 +107,7 @@ describe("hallway track routes", () => {
   });
 
   it("re-renders the form with the error and the typed values, escaped", async () => {
-    const app = createApp({ search, people: fakePeople() });
+    const app = createApp({ search, people: fakePeople(), readiness: alwaysReady });
     const res = await app.request("/people", form({ name: "<i>Ana</i>", interests: "k8s" }));
     expect(res.status).toBe(400);
     const html = await res.text();
@@ -117,13 +117,15 @@ describe("hallway track routes", () => {
   });
 
   it("rejects oversized form bodies", async () => {
-    const app = createApp({ search, people: fakePeople() });
+    const app = createApp({ search, people: fakePeople(), readiness: alwaysReady });
     const res = await app.request("/people", form({ name: "Ana", interests: "x".repeat(10_000) }));
     expect(res.status).toBe(413);
   });
 
   it("shows matches and talks with every value escaped and contacts as plain text", async () => {
-    const res = await createApp({ search, people: fakePeople() }).request(`/people/${SAMPLE_ID}?created=1`);
+    const res = await createApp({ search, people: fakePeople(), readiness: alwaysReady }).request(
+      `/people/${SAMPLE_ID}?created=1`,
+    );
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("Hi, Ana &lt;b&gt;");
@@ -137,7 +139,7 @@ describe("hallway track routes", () => {
 
   it("still shows talks when matching fails", async () => {
     const people = fakePeople({ findMatches: async () => Promise.reject(new Error("es down")) });
-    const res = await createApp({ search, people }).request(`/people/${SAMPLE_ID}`);
+    const res = await createApp({ search, people, readiness: alwaysReady }).request(`/people/${SAMPLE_ID}`);
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("Matches are temporarily unavailable");
@@ -145,22 +147,26 @@ describe("hallway track routes", () => {
   });
 
   it("offers deletion on real profiles only", async () => {
-    const own = await createApp({ search, people: fakePeople() }).request(`/people/${SAMPLE_ID}`);
+    const own = await createApp({ search, people: fakePeople(), readiness: alwaysReady }).request(
+      `/people/${SAMPLE_ID}`,
+    );
     expect(await own.text()).toContain("Delete my profile");
     const people = fakePeople({ getAttendee: async () => sampleAttendee({ sample: true }) });
-    const sample = await createApp({ search, people }).request(`/people/${SAMPLE_ID}`);
+    const sample = await createApp({ search, people, readiness: alwaysReady }).request(`/people/${SAMPLE_ID}`);
     const html = await sample.text();
     expect(html).not.toContain("Delete my profile");
     expect(html).toContain("sample profile seeded for the demo");
   });
 
   it("answers 404 for unknown profiles", async () => {
-    const res = await createApp({ search, people: fakePeople() }).request("/people/not-a-profile");
+    const res = await createApp({ search, people: fakePeople(), readiness: alwaysReady }).request(
+      "/people/not-a-profile",
+    );
     expect(res.status).toBe(404);
   });
 
   it("deletes a profile", async () => {
-    const app = createApp({ search, people: fakePeople() });
+    const app = createApp({ search, people: fakePeople(), readiness: alwaysReady });
     expect((await app.request(`/people/${SAMPLE_ID}/delete`, { method: "POST" })).status).toBe(200);
     expect((await app.request("/people/unknown/delete", { method: "POST" })).status).toBe(404);
   });

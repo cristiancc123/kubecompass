@@ -1,4 +1,7 @@
 import type { Attendee, AttendeeMatch, PeopleBackend } from "../src/people.js";
+import type { Readiness } from "../src/readiness.js";
+
+export const alwaysReady: Readiness = { isReady: () => true };
 
 export const SAMPLE_ID = "0b6f3c1e-2a4d-4c8e-9f10-1234567890ab";
 

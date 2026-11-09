@@ -1,10 +1,12 @@
 import { httpInstrumentationMiddleware } from "@hono/otel";
+import { trace } from "@opentelemetry/api";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { renderAskPage } from "./ask-ui.js";
 import { MAX_QUESTION_LENGTH, type AskBackend } from "./ask.js";
 import { log } from "./log.js";
 import { renderPeopleForm, renderPeopleMessage, renderProfile } from "./people-ui.js";
+import type { Readiness } from "./readiness.js";
 import { redactUrl } from "./redact.js";
 import { parseAttendeeInput, type PeopleBackend } from "./people.js";
 import { MAX_QUERY_LENGTH, type SearchBackend, type SearchQuery } from "./search.js";
@@ -14,6 +16,7 @@ import { renderPage } from "./ui.js";
 export interface AppDependencies {
   search: SearchBackend;
   people: PeopleBackend;
+  readiness: Readiness;
   /** Absent when no model is configured; /ask then explains that. */
   ask?: AskBackend;
   /** Shared budget for /ask. Each question costs a model call. */
@@ -75,37 +78,13 @@ export function createApp(deps: AppDependencies): Hono {
 
   app.get("/healthz", (c) => c.json({ status: "ok", version: deps.version ?? "dev" }));
 
-  // The probe runs every few seconds, so only changes are logged: the first
-  // failure says why (a 401 means the API key is wrong), recovery says so too.
-  // The public response stays generic.
-  let lastReady: boolean | undefined;
-  app.get("/readyz", async (c) => {
-    let failure: unknown;
-    try {
-      if (!(await deps.search.ping())) {
-        failure = new Error("Elasticsearch ping returned false");
-      }
-    } catch (error) {
-      failure = error;
-    }
-    const ready = failure === undefined;
-    if (ready !== lastReady) {
-      if (ready) {
-        log.info("readiness: Elasticsearch reachable");
-      } else {
-        const statusCode = (failure as { meta?: { statusCode?: number } }).meta?.statusCode;
-        log.error(
-          "readiness: Elasticsearch unreachable",
-          failure,
-          statusCode ? { "http.response.status_code": statusCode } : {},
-        );
-      }
-      lastReady = ready;
-    }
-    return ready
+  // Answers from the background check in src/readiness.ts: no remote call
+  // per probe, so a slow Elasticsearch round trip can't time the probe out.
+  app.get("/readyz", (c) =>
+    deps.readiness.isReady()
       ? c.json({ status: "ok", elasticsearch: "reachable" })
-      : c.json({ status: "degraded", elasticsearch: "unreachable" }, 503);
-  });
+      : c.json({ status: "degraded", elasticsearch: "unreachable" }, 503),
+  );
 
   app.get("/api/search", async (c) => {
     const parsed = parseSearchQuery(c.req.query());
@@ -150,6 +129,10 @@ export function createApp(deps: AppDependencies): Hono {
     const question = (c.req.query("q") ?? "").trim();
     const available = deps.ask !== undefined;
     if (!available || !question) {
+      if (!available) {
+        // Says why in the trace, so a 503 here isn't mistaken for an outage.
+        trace.getActiveSpan()?.setAttribute("kubecompass.ask.refused_reason", "not_configured");
+      }
       return c.html(renderAskPage({ question, available }), available ? 200 : 503);
     }
     if (question.length > MAX_QUESTION_LENGTH) {
@@ -157,6 +140,7 @@ export function createApp(deps: AppDependencies): Hono {
       return c.html(renderAskPage({ question: question.slice(0, MAX_QUESTION_LENGTH), error, available }), 400);
     }
     if (deps.askLimiter && !deps.askLimiter.tryAcquire()) {
+      trace.getActiveSpan()?.setAttribute("kubecompass.ask.refused_reason", "rate_limited");
       const error = "Lots of questions right now. Try again in a minute, or search the talks directly.";
       return c.html(renderAskPage({ question, error, available }), 429);
     }
