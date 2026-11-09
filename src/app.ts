@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { log } from "./log.js";
 import { renderPeopleForm, renderPeopleMessage, renderProfile } from "./people-ui.js";
+import { redactUrl } from "./redact.js";
 import { parseAttendeeInput, type PeopleBackend } from "./people.js";
 import { MAX_QUERY_LENGTH, type SearchBackend, type SearchQuery } from "./search.js";
 import { SERVICE_NAME } from "./telemetry.js";
@@ -57,15 +58,12 @@ export function createApp(deps: AppDependencies): Hono {
   const app = new Hono();
 
   // Spans and HTTP server metrics for every request. The query string holds
-  // what people searched for, so traces keep the path only.
+  // what people searched for and profile ids grant access, so neither leaves.
   app.use(
     httpInstrumentationMiddleware({
       serviceName: SERVICE_NAME,
       serviceVersion: deps.version,
-      getUrlFull: (c) => {
-        const url = new URL(c.req.url);
-        return `${url.origin}${url.pathname}`;
-      },
+      getUrlFull: (c) => redactUrl(c.req.url),
     }),
   );
 
