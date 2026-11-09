@@ -22,7 +22,19 @@ Built solo by Cristian Cano at the [WeMakeDevs Cloud Native Hackathon](https://w
 ## Setup
 
 1. Copy `.env.example` to `.env` and fill in the values. `.env` is git-ignored.
-2. Further steps land here as the project grows during the day.
+2. `npm install`, then `npm run dev` for the local server, or `npm test` for the test suite.
+
+## Deploy
+
+Deploys are GitOps, following the [cnh-starter](https://github.com/skyhook-io/cnh-starter) layout:
+
+1. A push to `main` runs `.github/workflows/deploy.yaml`, which builds the `Dockerfile` into `ghcr.io/cristiancc123/kubecompass:<short-sha>` and commits that tag to `deploy/kustomization.yaml`.
+2. Argo CD, inside the team's Radar cluster, syncs `deploy/` into namespace `team-kubecompass`. The Argo CD Application in `argocd/application.yaml` is applied once through Radar's MCP server.
+3. The app is served at https://kubecompass.cnh.radarhq.io.
+
+Credentials never go in git. Create the Secret `app-credentials` in namespace `team-kubecompass` by hand (for example in Radar's resource editor) with the keys `elasticsearch-url` and `elasticsearch-api-key`. The Deployment reads them through `secretKeyRef`.
+
+To try the image locally: `docker build -t kubecompass . && docker run --rm -p 8080:8080 --env-file .env kubecompass`.
 
 ## AI disclosure
 

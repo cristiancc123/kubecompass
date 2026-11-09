@@ -1,0 +1,14 @@
+# Argo CD deploys this folder to the team namespace. The build-and-deploy
+# workflow sets the image below on every push to main; don't edit newName or
+# newTag by hand.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: team-kubecompass
+resources:
+  - deployment.yaml
+  - service.yaml
+  - httproute.yaml
+images:
+  - name: app
+    newName: ghcr.io/cristiancc123/kubecompass
+    newTag: latest
