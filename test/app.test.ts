@@ -13,9 +13,17 @@ describe("app", () => {
     const app = createApp({ es: { ping: async () => true } });
     const res = await app.request("/readyz");
     expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "ok", elasticsearch: "reachable" });
   });
 
-  it("reports degraded readiness when Elasticsearch fails", async () => {
+  it("reports degraded readiness when the ping resolves to false", async () => {
+    const app = createApp({ es: { ping: async () => false } });
+    const res = await app.request("/readyz");
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ status: "degraded", elasticsearch: "unreachable" });
+  });
+
+  it("reports degraded readiness when Elasticsearch throws", async () => {
     const app = createApp({
       es: {
         ping: async () => {
@@ -25,7 +33,7 @@ describe("app", () => {
     });
     const res = await app.request("/readyz");
     expect(res.status).toBe(503);
-    expect(await res.json()).toMatchObject({ status: "degraded" });
+    expect(await res.json()).toMatchObject({ status: "degraded", elasticsearch: "connection refused" });
   });
 
   it("serves the landing page", async () => {
