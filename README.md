@@ -22,19 +22,20 @@ KubeCon has about 600 sessions and thousands of people. kubecompass helps an att
 
 ```mermaid
 flowchart LR
-  user([Attendee]) -->|HTTPS| route[HTTPRoute<br/>kubecompass.cnh.radarhq.io]
-  subgraph cluster["Radar team cluster · namespace team-kubecompass"]
-    route --> svc[Service app] --> pods["Deployment app<br/>2 replicas, Node 24 + Hono"]
-    argo[Argo CD] -->|syncs deploy/| pods
+  user(["Attendee"]) -->|"HTTPS"| route["HTTPRoute: kubecompass.cnh.radarhq.io"]
+  subgraph cluster["Radar team cluster, namespace team-kubecompass"]
+    route --> svc["Service app"]
+    svc --> pods["Deployment app: 2 replicas, Node 24 and Hono"]
+    argo["Argo CD"] -->|"syncs deploy folder"| pods
   end
-  pods -->|hybrid search, profiles| es[(Elasticsearch Serverless<br/>semantic_text + RRF)]
-  pods -->|grounded answers| claude[Claude Opus 5.5<br/>Anthropic API]
-  pods -->|OTLP traces, metrics, logs| dash0[Dash0]
-  pr([Pull request<br/>reviewed by Gitar]) --> gh[GitHub main]
-  gh -->|Actions: build, push, bump tag| ghcr[(GHCR image)]
-  gh -->|deploy/ manifests| argo
-  ghcr -->|pull| pods
-  radar[Radar Cloud<br/>checks, AI SRE] -.->|reads| cluster
+  pods -->|"hybrid search, profiles"| es[("Elasticsearch Serverless")]
+  pods -->|"grounded answers"| claude["Claude Opus 5.5 via Anthropic API"]
+  pods -->|"OTLP traces, metrics, logs"| dash0["Dash0"]
+  pr(["Pull request reviewed by Gitar"]) --> gh["GitHub main"]
+  gh -->|"Actions: build, push, bump tag"| ghcr[("GHCR image")]
+  gh -->|"manifests"| argo
+  ghcr -->|"pull"| pods
+  radar["Radar Cloud: checks, AI SRE"] -.->|"reads"| cluster
 ```
 
 ## How each tool is used
