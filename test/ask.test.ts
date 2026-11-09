@@ -13,7 +13,7 @@ import {
   type AskBackend,
 } from "../src/ask.js";
 import type { SearchBackend, SessionHit } from "../src/search.js";
-import { fakePeople } from "./fakes.js";
+import { fakePeople, alwaysReady } from "./fakes.js";
 
 function session(id: string, title: string): SessionHit {
   return {
@@ -154,7 +154,7 @@ describe("GET /ask", () => {
   const search = searchReturning(sources);
 
   function app(ask?: AskBackend, askLimiter?: { tryAcquire(): boolean }) {
-    return createApp({ search, people: fakePeople(), ask, askLimiter });
+    return createApp({ search, people: fakePeople(), readiness: alwaysReady, ask, askLimiter });
   }
 
   it("explains when no model is configured", async () => {

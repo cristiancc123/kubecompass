@@ -6,7 +6,7 @@ import { createApp } from "../src/app.js";
 import { createPeopleBackend, UNTRACED } from "../src/people.js";
 import { redactIds, redactUrl } from "../src/redact.js";
 import type { SearchBackend } from "../src/search.js";
-import { fakePeople, SAMPLE_ID, sampleAttendee } from "./fakes.js";
+import { fakePeople, SAMPLE_ID, sampleAttendee, alwaysReady } from "./fakes.js";
 
 describe("redaction helpers", () => {
   it("replaces ids in text and drops query strings from URLs", () => {
@@ -53,7 +53,7 @@ describe("profile ids in telemetry", () => {
         facets: { day: [], track: [], level: [], venue: [] },
       }),
     };
-    const app = createApp({ search, people: fakePeople() });
+    const app = createApp({ search, people: fakePeople(), readiness: alwaysReady });
     await app.request(`http://localhost/people/${SAMPLE_ID}?created=1`);
     await app.request(`http://localhost/people/${SAMPLE_ID}/delete`, { method: "POST" });
     expect(exporter.getFinishedSpans().length).toBeGreaterThan(0);
