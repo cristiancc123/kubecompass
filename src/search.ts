@@ -1,4 +1,5 @@
 import type { Client, estypes } from "@elastic/elasticsearch";
+import { metrics, SpanStatusCode, trace } from "@opentelemetry/api";
 import type { Session } from "./sessions.js";
 
 /** Exact-match filters, all optional. Values map to keyword fields in the index. */
@@ -186,24 +187,66 @@ function readFacets(aggregations: Record<string, estypes.AggregationsAggregate> 
   return { day: read("day"), track: read("track"), level: read("level"), venue: read("venue") };
 }
 
-/** Wraps the Elasticsearch client behind the narrow SearchBackend interface. */
+/**
+ * Wraps the Elasticsearch client behind the narrow SearchBackend interface.
+ * Each search runs in a span that the client's own Elasticsearch span nests
+ * under, and feeds a duration histogram split by mode and outcome. Call this
+ * after the telemetry SDK starts: meters taken earlier stay no-ops.
+ */
 export function createSearchBackend(es: Client, index: string): SearchBackend {
+  const tracer = trace.getTracer("kubecompass.search");
+  const duration = metrics.getMeter("kubecompass.search").createHistogram("kubecompass.search.duration", {
+    description: "Time to answer a session search, including Elasticsearch",
+    unit: "ms",
+  });
+
+  async function search(query: SearchQuery): Promise<SearchResult> {
+    const response = await es.search<Session>(buildSearchRequest(index, query));
+    const total =
+      typeof response.hits.total === "number" ? response.hits.total : (response.hits.total?.value ?? 0);
+    const hits: SessionHit[] = response.hits.hits.flatMap((hit) =>
+      hit._source ? [{ ...hit._source, score: hit._score ?? null }] : [],
+    );
+    return {
+      mode: query.q.trim() ? "hybrid" : "browse",
+      total,
+      took: response.took,
+      hits,
+      facets: readFacets(response.aggregations),
+    };
+  }
+
   return {
     ping: () => es.ping(),
-    async searchSessions(query) {
-      const response = await es.search<Session>(buildSearchRequest(index, query));
-      const total =
-        typeof response.hits.total === "number" ? response.hits.total : (response.hits.total?.value ?? 0);
-      const hits: SessionHit[] = response.hits.hits.flatMap((hit) =>
-        hit._source ? [{ ...hit._source, score: hit._score ?? null }] : [],
-      );
-      return {
-        mode: query.q.trim() ? "hybrid" : "browse",
-        total,
-        took: response.took,
-        hits,
-        facets: readFacets(response.aggregations),
-      };
+    searchSessions(query) {
+      const mode = query.q.trim() ? "hybrid" : "browse";
+      return tracer.startActiveSpan("search sessions", async (span) => {
+        const started = performance.now();
+        // Filters and lengths only: the free text stays out of telemetry.
+        span.setAttributes({
+          "kubecompass.search.mode": mode,
+          "kubecompass.search.query_length": query.q.trim().length,
+          "kubecompass.search.filters": FACET_FIELDS.filter((field) => query[field]).join(","),
+        });
+        let outcome = "ok";
+        try {
+          const result = await search(query);
+          span.setAttributes({
+            "kubecompass.search.total": result.total,
+            "kubecompass.search.returned": result.hits.length,
+            "kubecompass.search.es_took_ms": result.took,
+          });
+          return result;
+        } catch (error) {
+          outcome = "error";
+          span.recordException(error instanceof Error ? error : String(error));
+          span.setStatus({ code: SpanStatusCode.ERROR, message: "search failed" });
+          throw error;
+        } finally {
+          duration.record(performance.now() - started, { "kubecompass.search.mode": mode, outcome });
+          span.end();
+        }
+      });
     },
   };
 }

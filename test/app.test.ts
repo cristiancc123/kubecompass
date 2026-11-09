@@ -48,7 +48,12 @@ describe("probes", () => {
   it("answers the liveness probe", async () => {
     const res = await createApp({ search: fakeBackend() }).request("/healthz");
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ status: "ok" });
+    expect(await res.json()).toEqual({ status: "ok", version: "dev" });
+  });
+
+  it("reports the deployed version on the liveness probe", async () => {
+    const res = await createApp({ search: fakeBackend(), version: "1fe4b61" }).request("/healthz");
+    expect(await res.json()).toEqual({ status: "ok", version: "1fe4b61" });
   });
 
   it("reports readiness when Elasticsearch answers", async () => {

@@ -13,6 +13,20 @@ describe("loadConfig", () => {
     expect(config.elasticsearchApiKey).toBe(env.ELASTICSEARCH_API_KEY);
     expect(config.port).toBe(3000);
     expect(config.sessionsIndex).toBe("kubecon-sessions");
+    expect(config.appVersion).toBe("dev");
+    expect(config.telemetry).toBeUndefined();
+  });
+
+  it("enables telemetry only when both Dash0 values are set", () => {
+    expect(loadConfig({ ...env, DASH0_OTLP_ENDPOINT: "https://ingress.example.com" }).telemetry).toBeUndefined();
+    const config = loadConfig({
+      ...env,
+      APP_VERSION: "abc1234",
+      DASH0_OTLP_ENDPOINT: "https://ingress.example.com/",
+      DASH0_AUTH_TOKEN: "token",
+    });
+    expect(config.appVersion).toBe("abc1234");
+    expect(config.telemetry).toEqual({ otlpEndpoint: "https://ingress.example.com", authToken: "token", dataset: undefined });
   });
 
   it("honours optional overrides", () => {

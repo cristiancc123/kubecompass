@@ -34,9 +34,19 @@ Deploys are GitOps, following the [cnh-starter](https://github.com/skyhook-io/cn
 
 The image must be public, because the cluster has no registry credentials. GHCR creates a new package as private, so after the first build open the package on GitHub, then Package settings > Change visibility > Public, and re-run the workflow. The workflow checks anonymous pulls and refuses to point the manifests at an image the cluster can't fetch.
 
-Credentials never go in git. Create the Secret `app-credentials` in namespace `team-kubecompass` by hand (for example in Radar's resource editor) with the keys `elasticsearch-url` and `elasticsearch-api-key`. The Deployment reads them through `secretKeyRef`.
+Credentials never go in git. Create the Secret `app-credentials` in namespace `team-kubecompass` by hand (for example in Radar's resource editor) with the keys `elasticsearch-url`, `elasticsearch-api-key` and, for telemetry, `dash0-auth-token`. The Deployment reads them through `secretKeyRef`.
 
 To try the image locally: `docker build -t kubecompass . && docker run --rm -p 8080:8080 --env-file .env kubecompass`.
+
+## Observability
+
+With `DASH0_OTLP_ENDPOINT` and `DASH0_AUTH_TOKEN` set, the app exports traces, metrics and logs to Dash0 over OTLP/HTTP (`src/telemetry.ts`). Without them telemetry is off and nothing else changes.
+
+- Every request is a span from the Hono middleware. A search adds a `search sessions` span with the mode, filters and totals, and the Elasticsearch client nests its own span under it.
+- `kubecompass.search.duration` is a histogram split by mode and outcome.
+- Errors are OpenTelemetry log records that carry the trace id, so Dash0 links a log line to its request.
+- In Kubernetes, `OTEL_RESOURCE_ATTRIBUTES` adds the pod, namespace, node and cluster to everything the app sends.
+- What people type stays out: spans keep the URL path without the query string, and record query lengths and counts, never the text.
 
 ## AI disclosure
 

@@ -1,9 +1,14 @@
+import { httpInstrumentationMiddleware } from "@hono/otel";
 import { Hono } from "hono";
+import { log } from "./log.js";
 import { MAX_QUERY_LENGTH, type SearchBackend, type SearchQuery } from "./search.js";
+import { SERVICE_NAME } from "./telemetry.js";
 import { renderPage } from "./ui.js";
 
 export interface AppDependencies {
   search: SearchBackend;
+  /** Reported by /healthz so a deploy can be matched to its image tag. */
+  version?: string;
 }
 
 const MAX_FILTER_LENGTH = 100;
@@ -44,7 +49,20 @@ export function parseSearchQuery(params: Record<string, string | undefined>): Pa
 export function createApp(deps: AppDependencies): Hono {
   const app = new Hono();
 
-  app.get("/healthz", (c) => c.json({ status: "ok" }));
+  // Spans and HTTP server metrics for every request. The query string holds
+  // what people searched for, so traces keep the path only.
+  app.use(
+    httpInstrumentationMiddleware({
+      serviceName: SERVICE_NAME,
+      serviceVersion: deps.version,
+      getUrlFull: (c) => {
+        const url = new URL(c.req.url);
+        return `${url.origin}${url.pathname}`;
+      },
+    }),
+  );
+
+  app.get("/healthz", (c) => c.json({ status: "ok", version: deps.version ?? "dev" }));
 
   app.get("/readyz", async (c) => {
     try {
@@ -67,7 +85,7 @@ export function createApp(deps: AppDependencies): Hono {
     try {
       return c.json(await deps.search.searchSessions(parsed.query));
     } catch (error) {
-      console.error("search failed", error);
+      log.error("search failed", error);
       return c.json({ error: "Search is temporarily unavailable" }, 502);
     }
   });
@@ -86,7 +104,7 @@ export function createApp(deps: AppDependencies): Hono {
       const result = await deps.search.searchSessions(parsed.query);
       return c.html(renderPage({ query: parsed.query, result }));
     } catch (error) {
-      console.error("search failed", error);
+      log.error("search failed", error);
       return c.html(
         renderPage({
           query: parsed.query,
