@@ -10,8 +10,17 @@ export interface Config {
   attendeesIndex: string;
   /** Image tag set at build time; "dev" when running from source. */
   appVersion: string;
+  /** Present only when an Anthropic API key is set; without it /ask is disabled. */
+  ask?: AskConfig;
   /** Present only when both Dash0 values are set, so local runs work without telemetry. */
   telemetry?: TelemetryConfig;
+}
+
+export interface AskConfig {
+  anthropicApiKey: string;
+  model: string;
+  /** Questions per minute per pod. Each one is a paid model call. */
+  limitPerMinute: number;
 }
 
 export interface TelemetryConfig {
@@ -20,6 +29,19 @@ export interface TelemetryConfig {
   authToken: string;
   /** Dash0 dataset; omitted means the organization's default dataset. */
   dataset?: string;
+}
+
+/** A positive integer, or the fallback when unset. Anything else fails at startup. */
+function positiveInt(env: NodeJS.ProcessEnv, name: string, fallback: number): number {
+  const raw = env[name];
+  if (raw === undefined || raw === "") {
+    return fallback;
+  }
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`${name} must be a positive integer, got "${raw}"`);
+  }
+  return value;
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
@@ -48,5 +70,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     attendeesIndex: env.ATTENDEES_INDEX ?? "kubecon-attendees",
     appVersion: env.APP_VERSION ?? "dev",
     telemetry: telemetryConfig(env),
+    ask: env.ANTHROPIC_API_KEY
+      ? {
+          anthropicApiKey: env.ANTHROPIC_API_KEY,
+          model: env.ASK_MODEL || "claude-opus-5-5",
+          limitPerMinute: positiveInt(env, "ASK_LIMIT_PER_MINUTE", 20),
+        }
+      : undefined,
   };
 }

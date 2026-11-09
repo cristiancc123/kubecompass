@@ -26,7 +26,11 @@ describe("loadConfig", () => {
       DASH0_AUTH_TOKEN: "token",
     });
     expect(config.appVersion).toBe("abc1234");
-    expect(config.telemetry).toEqual({ otlpEndpoint: "https://ingress.example.com", authToken: "token", dataset: undefined });
+    expect(config.telemetry).toEqual({
+      otlpEndpoint: "https://ingress.example.com",
+      authToken: "token",
+      dataset: undefined,
+    });
   });
 
   it("honours optional overrides", () => {
@@ -39,5 +43,20 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ELASTICSEARCH_URL: env.ELASTICSEARCH_URL })).toThrow(
       "Missing required environment variable ELASTICSEARCH_API_KEY",
     );
+  });
+
+  it("enables the assistant with a key and validates its rate limit", () => {
+    expect(loadConfig(env).ask).toBeUndefined();
+    expect(loadConfig({ ...env, ANTHROPIC_API_KEY: "k" }).ask).toEqual({
+      anthropicApiKey: "k",
+      model: "claude-opus-5-5",
+      limitPerMinute: 20,
+    });
+    expect(loadConfig({ ...env, ANTHROPIC_API_KEY: "k", ASK_LIMIT_PER_MINUTE: "5" }).ask?.limitPerMinute).toBe(5);
+    for (const bad of ["abc", "0", "-1", "2.5"]) {
+      expect(() => loadConfig({ ...env, ANTHROPIC_API_KEY: "k", ASK_LIMIT_PER_MINUTE: bad })).toThrow(
+        "ASK_LIMIT_PER_MINUTE must be a positive integer",
+      );
+    }
   });
 });

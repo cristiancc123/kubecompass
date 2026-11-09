@@ -50,6 +50,13 @@ spec:
                   name: app-credentials
                   key: dash0-auth-token
                   optional: true
+            # Enables /ask. Without the key the page says the assistant isn't configured.
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-credentials
+                  key: anthropic-api-key
+                  optional: true
             # Kubernetes identity on every span, metric and log record.
             - name: K8S_POD_NAME
               valueFrom:

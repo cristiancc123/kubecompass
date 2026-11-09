@@ -1,6 +1,8 @@
 import { httpInstrumentationMiddleware } from "@hono/otel";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { renderAskPage } from "./ask-ui.js";
+import { MAX_QUESTION_LENGTH, type AskBackend } from "./ask.js";
 import { log } from "./log.js";
 import { renderPeopleForm, renderPeopleMessage, renderProfile } from "./people-ui.js";
 import { redactUrl } from "./redact.js";
@@ -12,6 +14,10 @@ import { renderPage } from "./ui.js";
 export interface AppDependencies {
   search: SearchBackend;
   people: PeopleBackend;
+  /** Absent when no model is configured; /ask then explains that. */
+  ask?: AskBackend;
+  /** Shared budget for /ask. Each question costs a model call. */
+  askLimiter?: { tryAcquire(): boolean };
   /** Reported by /healthz so a deploy can be matched to its image tag. */
   version?: string;
 }
@@ -118,6 +124,30 @@ export function createApp(deps: AppDependencies): Hono {
         }),
         502,
       );
+    }
+  });
+
+  app.get("/ask", async (c) => {
+    const question = (c.req.query("q") ?? "").trim();
+    const available = deps.ask !== undefined;
+    if (!available || !question) {
+      return c.html(renderAskPage({ question, available }), available ? 200 : 503);
+    }
+    if (question.length > MAX_QUESTION_LENGTH) {
+      const error = `Questions must be at most ${MAX_QUESTION_LENGTH} characters.`;
+      return c.html(renderAskPage({ question: question.slice(0, MAX_QUESTION_LENGTH), error, available }), 400);
+    }
+    if (deps.askLimiter && !deps.askLimiter.tryAcquire()) {
+      const error = "Lots of questions right now. Try again in a minute, or search the talks directly.";
+      return c.html(renderAskPage({ question, error, available }), 429);
+    }
+    try {
+      const result = await deps.ask!.ask(question);
+      return c.html(renderAskPage({ question, result, available }));
+    } catch (error) {
+      log.error("ask failed", error);
+      const message = "The assistant is temporarily unavailable. Try again in a moment, or search the talks directly.";
+      return c.html(renderAskPage({ question, error: message, available }), 502);
     }
   });
 

@@ -141,7 +141,7 @@ export interface LayoutModel {
   title: string;
   description: string;
   /** Which navigation link is the current page. */
-  current: "talks" | "people";
+  current: "talks" | "ask" | "people";
   tagline: string;
   /** Id of the main region the skip link jumps to. */
   skipTarget: string;
@@ -198,6 +198,9 @@ export function renderLayout(page: LayoutModel): string {
     .notice { background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; padding: 12px 16px; margin: 0 0 16px; }
     h2.section { font-size: 1.25rem; margin: 32px 0 12px; }
     .contact { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem; }
+    .answer { margin: 24px 0 0; } .answer .desc { margin: 0; font-size: 1.05rem; }
+    .ref { font-weight: 600; text-decoration: none; }
+    button:disabled, input:disabled { opacity: 0.6; cursor: not-allowed; }
     button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
   </style>
 </head>
@@ -205,7 +208,7 @@ export function renderLayout(page: LayoutModel): string {
   <a class="skip" href="#${escapeHtml(page.skipTarget)}">Skip to main content</a>
   <header>
     <h1>kube<span>compass</span></h1>
-    <nav aria-label="Main">${navLink("talks", "/", "Talks")}${navLink("people", "/people", "Hallway track")}</nav>
+    <nav aria-label="Main">${navLink("talks", "/", "Talks")}${navLink("ask", "/ask", "Ask")}${navLink("people", "/people", "Hallway track")}</nav>
     <p class="tagline">${escapeHtml(page.tagline)}</p>
   </header>
   <main>

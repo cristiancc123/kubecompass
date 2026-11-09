@@ -7,6 +7,7 @@ Built solo by Cristian Cano at the [WeMakeDevs Cloud Native Hackathon](https://w
 ## What it does
 
 - **Talk finder**: hybrid search (keyword + semantic) over the KubeCon schedule, so "something on eBPF and security after lunch" returns the right sessions.
+- **Ask**: questions in plain words, answered by Claude from the sessions hybrid search retrieves, with every claim citing its session.
 - **Hallway track**: matches attendees with similar interests so they can actually meet.
 - **Fully observable**: traces, logs and metrics via OpenTelemetry, runs on Kubernetes.
 
@@ -34,7 +35,7 @@ Deploys are GitOps, following the [cnh-starter](https://github.com/skyhook-io/cn
 
 The image must be public, because the cluster has no registry credentials. GHCR creates a new package as private, so after the first build open the package on GitHub, then Package settings > Change visibility > Public, and re-run the workflow. The workflow checks anonymous pulls and refuses to point the manifests at an image the cluster can't fetch.
 
-Credentials never go in git. Create the Secret `app-credentials` in namespace `team-kubecompass` by hand (for example in Radar's resource editor) with the keys `elasticsearch-url`, `elasticsearch-api-key` and, for telemetry, `dash0-auth-token`. The Deployment reads them through `secretKeyRef`.
+Credentials never go in git. Create the Secret `app-credentials` in namespace `team-kubecompass` by hand (for example in Radar's resource editor) with the keys `elasticsearch-url`, `elasticsearch-api-key` and, optionally, `dash0-auth-token` for telemetry and `anthropic-api-key` for the Ask assistant. The Deployment reads them through `secretKeyRef`.
 
 To try the image locally: `docker build -t kubecompass . && docker run --rm -p 8080:8080 --env-file .env kubecompass`.
 
