@@ -1,0 +1,20 @@
+# Applied once through Radar's MCP server (apply_resource). Afterwards Argo CD
+# deploys deploy/ on every push to main. The repo is public so Argo CD can read it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app
+  namespace: team-kubecompass
+spec:
+  project: team-kubecompass
+  source:
+    repoURL: https://github.com/cristiancc123/kubecompass.git
+    targetRevision: main
+    path: deploy
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: team-kubecompass
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
