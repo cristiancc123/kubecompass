@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { trace } from "@opentelemetry/api";
+import { context, trace } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
@@ -157,10 +158,21 @@ describe("GET /ask", () => {
     return createApp({ search, people: fakePeople(), readiness: alwaysReady, ask, askLimiter });
   }
 
-  it("explains when no model is configured", async () => {
-    const res = await app().request("/ask?q=anything");
-    expect(res.status).toBe(503);
-    expect(await res.text()).toContain("not configured");
+  it("explains when no model is configured, in the page and in the trace", async () => {
+    const exporter = new InMemorySpanExporter();
+    trace.setGlobalTracerProvider(new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] }));
+    // The SDK installs this in production; without it there is no active span.
+    context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+    try {
+      const res = await app().request("/ask?q=anything");
+      expect(res.status).toBe(503);
+      expect(await res.text()).toContain("not configured");
+      const server = exporter.getFinishedSpans().find((span) => span.name.startsWith("GET"));
+      expect(server?.attributes["kubecompass.ask.refused_reason"]).toBe("not_configured");
+    } finally {
+      trace.disable();
+      context.disable();
+    }
   });
 
   it("shows the form without calling the model when there is no question", async () => {

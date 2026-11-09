@@ -34,9 +34,12 @@ export function startTelemetry(config: Config): () => Promise<void> {
   const url = (signal: string) => `${telemetry.otlpEndpoint}/v1/${signal}`;
 
   const sdk = new NodeSDK({
+    // "local" unless OTEL_RESOURCE_ATTRIBUTES says otherwise, as the cluster
+    // does, so runs from a laptop don't mix into production in Dash0.
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: SERVICE_NAME,
       [ATTR_SERVICE_VERSION]: config.appVersion,
+      "deployment.environment.name": "local",
     }),
     spanProcessors: [new BatchSpanProcessor({ exporter: new OTLPTraceExporter({ url: url("traces"), headers }) })],
     metricReaders: [

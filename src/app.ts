@@ -1,4 +1,5 @@
 import { httpInstrumentationMiddleware } from "@hono/otel";
+import { trace } from "@opentelemetry/api";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { renderAskPage } from "./ask-ui.js";
@@ -128,6 +129,10 @@ export function createApp(deps: AppDependencies): Hono {
     const question = (c.req.query("q") ?? "").trim();
     const available = deps.ask !== undefined;
     if (!available || !question) {
+      if (!available) {
+        // Says why in the trace, so a 503 here isn't mistaken for an outage.
+        trace.getActiveSpan()?.setAttribute("kubecompass.ask.refused_reason", "not_configured");
+      }
       return c.html(renderAskPage({ question, available }), available ? 200 : 503);
     }
     if (question.length > MAX_QUESTION_LENGTH) {
@@ -135,6 +140,7 @@ export function createApp(deps: AppDependencies): Hono {
       return c.html(renderAskPage({ question: question.slice(0, MAX_QUESTION_LENGTH), error, available }), 400);
     }
     if (deps.askLimiter && !deps.askLimiter.tryAcquire()) {
+      trace.getActiveSpan()?.setAttribute("kubecompass.ask.refused_reason", "rate_limited");
       const error = "Lots of questions right now. Try again in a minute, or search the talks directly.";
       return c.html(renderAskPage({ question, error, available }), 429);
     }
