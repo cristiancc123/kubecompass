@@ -43,6 +43,24 @@ describe("parseSchedule", () => {
       expect(session.links[0].url).toMatch(/^https?:\/\//);
     }
   });
+
+  it("separates neighbouring paragraphs so words do not run together", () => {
+    for (const session of sessions) {
+      expect(session.description).not.toMatch(/[a-z][.!?][A-Z]/);
+    }
+    const multiParagraph = parseSchedule(
+      `<div class="sess-wrap"><a class="sess-link" href="/?id=1" data-session-id="1"></a>
+       <div class="sess__title">T</div>
+       <div class="sess__seodesc"><p>First sentence.</p><p>Second sentence.<br>Third line.</p></div></div>`,
+    );
+    expect(multiParagraph[0].description).toBe("First sentence. Second sentence. Third line.");
+  });
+
+  it("does not index asset badges such as slides as tags", () => {
+    const [atlantis] = sessions.filter((s) => s.title.startsWith("Atlantis"));
+    expect(atlantis.tags).not.toContainEqual(expect.stringMatching(/Slides/));
+    expect(atlantis.tags.every((tag) => !tag.startsWith("↓"))).toBe(true);
+  });
 });
 
 describe("toEventIso", () => {

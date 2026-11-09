@@ -89,6 +89,9 @@ async function main(): Promise<void> {
   console.log(
     `Indexed ${result.successful} sessions into ${index} (${result.failed} failed, ${result.time} ms)`,
   );
+  if (result.failed > 0) {
+    throw new Error(`${result.failed} sessions were not indexed`);
+  }
 }
 
 main().catch((error) => {

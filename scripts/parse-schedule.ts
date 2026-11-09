@@ -13,6 +13,15 @@ const LEVELS = new Set(["Beginner", "Intermediate", "Advanced", "Any Level"]);
 /** Cloudflare replaces obfuscated e-mails with this placeholder; it is noise for search. */
 const EMAIL_PLACEHOLDER = /\[email\s*protected\]/gi;
 
+/** Badges such as "↓ Slides" describe assets, not the session, so they are not tags. */
+const ASSET_BADGE = /^↓/;
+
+/**
+ * Block-level boundaries become whitespace before parsing, otherwise the text of
+ * neighbouring paragraphs runs together ("receptions.Info") and search loses both words.
+ */
+const BLOCK_BOUNDARY = /<\/?(p|li|ul|ol|div|h[1-6]|blockquote|tr|td|th)\b[^>]*>|<br\s*\/?>/gi;
+
 function clean(text: string | undefined): string {
   return (text ?? "").replace(EMAIL_PLACEHOLDER, "").replace(/\s+/g, " ").trim();
 }
@@ -37,7 +46,7 @@ export function splitTags(tags: { text: string; primary: boolean }[]): {
   const rest: string[] = [];
   for (const tag of tags) {
     const text = clean(tag.text);
-    if (!text) continue;
+    if (!text || ASSET_BADGE.test(text)) continue;
     if (tag.primary && !track) {
       track = text;
     } else if (LEVELS.has(text) && level === null) {
@@ -99,7 +108,7 @@ function parseCard(card: HTMLElement): Session | null {
 
 /** Parses the schedule HTML into sessions, skipping cards without an id or title. */
 export function parseSchedule(html: string): Session[] {
-  const root = parse(html);
+  const root = parse(html.replace(BLOCK_BOUNDARY, " $& "));
   const sessions: Session[] = [];
   for (const card of root.querySelectorAll(".sess-wrap")) {
     const session = parseCard(card);
@@ -112,7 +121,9 @@ export function parseSchedule(html: string): Session[] {
 
 /** Downloads the live schedule page. */
 export async function fetchScheduleHtml(url: string = SCHEDULE_URL): Promise<string> {
-  const res = await fetch(url, { headers: { "user-agent": "kubecompass/0.1 (+https://github.com/cristiancc123/kubecompass)" } });
+  const res = await fetch(url, {
+    headers: { "user-agent": "kubecompass/0.1 (+https://github.com/cristiancc123/kubecompass)" },
+  });
   if (!res.ok) {
     throw new Error(`Schedule download failed: HTTP ${res.status}`);
   }
