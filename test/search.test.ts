@@ -1,8 +1,12 @@
+import type { Client } from "@elastic/elasticsearch";
+import { trace } from "@opentelemetry/api";
+import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
 import { describe, expect, it } from "vitest";
 import {
   buildFilters,
   buildSearchRequest,
   clampSize,
+  createSearchBackend,
   DEFAULT_SIZE,
   facetAggregations,
   MAX_SIZE,
@@ -87,5 +91,30 @@ describe("ui helpers", () => {
     const text = "alpha beta gamma delta epsilon";
     expect(truncate(text, 100)).toBe(text);
     expect(truncate(text, 12)).toBe("alpha beta…");
+  });
+});
+
+describe("createSearchBackend", () => {
+  it("records the search in a span without the free text", async () => {
+    const exporter = new InMemorySpanExporter();
+    const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+    trace.setGlobalTracerProvider(provider);
+    try {
+      const es = {
+        search: async () => ({ took: 4, hits: { total: { value: 1, relation: "eq" }, hits: [] }, aggregations: {} }),
+      } as unknown as Client;
+      await createSearchBackend(es, "sessions").searchSessions({ q: "secret plans", track: "Security" });
+      const [span] = exporter.getFinishedSpans();
+      expect(span.name).toBe("search sessions");
+      expect(span.attributes).toMatchObject({
+        "kubecompass.search.mode": "hybrid",
+        "kubecompass.search.query_length": 12,
+        "kubecompass.search.filters": "track",
+        "kubecompass.search.total": 1,
+      });
+      expect(JSON.stringify(span.attributes)).not.toContain("secret plans");
+    } finally {
+      trace.disable();
+    }
   });
 });
