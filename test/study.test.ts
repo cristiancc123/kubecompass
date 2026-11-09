@@ -103,6 +103,8 @@ describe("study helpers", () => {
     expect(pickLanguage("pt", "es-CO,es;q=0.9")).toBe("pt");
     expect(pickLanguage(undefined, "es-CO,es;q=0.9,en;q=0.8")).toBe("es");
     expect(pickLanguage("xx", "de-DE")).toBe("en");
+    expect(pickLanguage("constructor", undefined)).toBe("en");
+    expect(pickLanguage("toString", "__proto__")).toBe("en");
     expect(pickLevel("advanced")).toBe("advanced");
     expect(pickLevel("expert")).toBe("beginner");
   });
@@ -164,7 +166,9 @@ describe("GET /talks/:id/study", () => {
 
   it("answers 404 for unknown sessions, 503 without a model, 429 when limited and 502 on failure", async () => {
     expect((await app(fakeStudy()).request("/talks/42/study")).status).toBe(404);
-    expect((await app().request(`/talks/${session.id}/study`)).status).toBe(503);
+    const notConfigured = await app().request(`/talks/${session.id}/study`);
+    expect(notConfigured.status).toBe(503);
+    expect(await notConfigured.text()).toContain('<a href="/" aria-current="page">Talks</a>');
     expect(
       (await app(fakeStudy(), { tryAcquire: () => false }).request(`/talks/${session.id}/study?go=1`)).status,
     ).toBe(429);

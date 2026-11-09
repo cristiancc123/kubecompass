@@ -46,8 +46,6 @@ export interface StudyPageModel {
   language: Language;
   result?: StudyResult | null;
   error?: string;
-  /** False when no model is configured: the form shows, generation doesn't. */
-  available: boolean;
 }
 
 function options<T extends string>(values: readonly T[], selected: T, label: (value: T) => string): string {
@@ -94,24 +92,21 @@ function renderGuide(result: StudyResult, language: Language): string {
  * One session turned into something to remember and practice: key ideas,
  * flashcards and a challenge at the learner's level, in their language.
  */
-export function renderStudyPage({ session, level, language, result, error, available }: StudyPageModel): string {
-  const body = !available
-    ? `<p class="notice" role="status">The study assistant is not configured on this deployment.</p>`
-    : error
-      ? `<p class="error" role="alert">${escapeHtml(error)}</p>`
-      : result
-        ? renderGuide(result, language)
-        : "";
-  const disabled = available ? "" : " disabled";
+export function renderStudyPage({ session, level, language, result, error }: StudyPageModel): string {
+  const body = error
+    ? `<p class="error" role="alert">${escapeHtml(error)}</p>`
+    : result
+      ? renderGuide(result, language)
+      : "";
   const content = `<section id="study" tabindex="-1" aria-labelledby="study-title">
       <h2 class="section" id="study-title">Study: <a href="${escapeHtml(session.url)}" rel="noopener" target="_blank">${escapeHtml(session.title)}</a></h2>
       <p class="meta"><time datetime="${escapeHtml(session.start)}">${escapeHtml(formatSlot(session.start, session.end))}</time> · ${escapeHtml(session.room || "Room to be announced")}</p>
       <form method="get" action="/talks/${escapeHtml(session.id)}/study">
         <div class="filters">
-          <label for="level">My level<select id="level" name="level"${disabled}>${options(LEVELS, level, (v) => LEVEL_LABELS[v])}</select></label>
-          <label for="lang">Language<select id="lang" name="lang"${disabled}>${options(Object.keys(LANGUAGES) as Language[], language, (v) => LANGUAGES[v])}</select></label>
+          <label for="level">My level<select id="level" name="level">${options(LEVELS, level, (v) => LEVEL_LABELS[v])}</select></label>
+          <label for="lang">Language<select id="lang" name="lang">${options(Object.keys(LANGUAGES) as Language[], language, (v) => LANGUAGES[v])}</select></label>
         </div>
-        <div><button type="submit" name="go" value="1"${disabled}>Make my study guide</button></div>
+        <div><button type="submit" name="go" value="1">Make my study guide</button></div>
       </form>
       <p class="hint">Written by Claude from the session's description, not from a recording. Use it to prepare before the talk and to review after it.</p>
       <div aria-live="polite">${body}</div>
@@ -127,15 +122,33 @@ export function renderStudyPage({ session, level, language, result, error, avail
   });
 }
 
+/** Own keys only: `in` would also accept inherited names such as "constructor". */
+function isLanguage(value: string): value is Language {
+  return Object.hasOwn(LANGUAGES, value);
+}
+
+/** Shown instead of a study page when the session or the assistant isn't there. */
+export function renderStudyMessage(message: string): string {
+  return renderLayout({
+    title: "Study · kubecompass",
+    description: "Key ideas, review questions and a hands-on challenge for KubeCon sessions.",
+    current: "talks",
+    tagline: "Remember what matters and practice it at your level, in your language.",
+    skipTarget: "message",
+    content: `<section id="message" tabindex="-1"><p class="notice" role="status">${escapeHtml(message)}</p><p><a href="/">Search the talks</a></p></section>`,
+    footer: "Study guides by Claude from the official session descriptions. Check the talk itself for the details.",
+  });
+}
+
 /** Picks the guide language from the query string, then the browser's Accept-Language. */
 export function pickLanguage(queryLang: string | undefined, acceptLanguage: string | undefined): Language {
-  if (queryLang && queryLang in LANGUAGES) {
-    return queryLang as Language;
+  if (queryLang && isLanguage(queryLang)) {
+    return queryLang;
   }
   const preferred = (acceptLanguage ?? "")
     .split(",")
     .map((part) => part.trim().slice(0, 2).toLowerCase())
-    .find((code) => code in LANGUAGES);
+    .find(isLanguage);
   return (preferred as Language | undefined) ?? "en";
 }
 
