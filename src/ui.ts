@@ -77,6 +77,7 @@ function renderHit(hit: SessionHit): string {
     <p class="meta"><time datetime="${escapeHtml(hit.start)}">${escapeHtml(formatSlot(hit.start, hit.end))}</time> · ${escapeHtml(hit.room || "Room to be announced")}</p>
     ${speakers}
     ${description}
+    <p class="study-link"><a href="/talks/${escapeHtml(hit.id)}/study">Study this talk<span class="visually-hidden">: ${escapeHtml(hit.title)}</span></a></p>
     <ul class="tags" aria-label="Tags">${tags.map((tag) => `<li>${escapeHtml(tag)}</li>`).join("")}</ul>
   </article>
 </li>`;
@@ -203,6 +204,11 @@ export function renderLayout(page: LayoutModel): string {
     .answer { margin: 24px 0 0; } .answer .desc { margin: 0; font-size: 1.05rem; }
     .ref { font-weight: 600; text-decoration: none; }
     button:disabled, input:disabled { opacity: 0.6; cursor: not-allowed; }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .study-link { margin: 8px 0 0; font-size: 0.95rem; }
+    .ideas { margin: 0; padding: 16px 16px 16px 36px; display: grid; gap: 8px; }
+    .steps { margin: 0; padding: 0 0 0 20px; display: grid; gap: 8px; }
+    details summary { cursor: pointer; color: var(--accent); font-weight: 600; }
     button.secondary { background: transparent; color: var(--text); border: 1px solid var(--control-border); }
   </style>
 </head>

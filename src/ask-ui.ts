@@ -18,6 +18,7 @@ function renderSource(hit: SessionHit, n: number): string {
   <h3><span class="ref">[${n}]</span> <a href="${escapeHtml(hit.url)}" rel="noopener" target="_blank">${escapeHtml(hit.title)}</a></h3>
   <p class="meta"><time datetime="${escapeHtml(hit.start)}">${escapeHtml(formatSlot(hit.start, hit.end))}</time> · ${escapeHtml(hit.room || "Room to be announced")}</p>
   ${hit.speakers ? `<p class="speakers">${escapeHtml(hit.speakers)}</p>` : ""}
+  <p class="study-link"><a href="/talks/${escapeHtml(hit.id)}/study">Study this talk<span class="visually-hidden">: ${escapeHtml(hit.title)}</span></a></p>
 </li>`;
 }
 

@@ -12,6 +12,7 @@ KubeCon has about 600 sessions and thousands of people. kubecompass helps an att
 
 - **Talks**: hybrid search over the whole schedule. Keyword (BM25) and semantic retrieval are fused with reciprocal rank fusion, so "something on eBPF and security after lunch" finds runtime-security talks even when they never say "eBPF and security". Day, track, level and venue filters keep their counts as you narrow down.
 - **Ask**: a question in plain words, answered by Claude from the sessions hybrid search retrieves. Every claim cites its session, and the citations link to the session cards.
+- **Study this talk**: every session card has a study page. Claude turns the session into three key ideas to remember, three review flashcards, and a hands-on challenge sized to your level (beginner, intermediate or advanced), in Spanish, English, Portuguese or French. Made for attendees who learn by doing and for those whose first language isn't English.
 - **Hallway track**: describe what you work on and get the five attendees whose interests match yours, plus the talks where you'll likely find them. Profiles are private links that only their owner can open or delete.
 
 | Talks | Ask | Hallway track |
