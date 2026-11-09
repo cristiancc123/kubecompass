@@ -46,6 +46,26 @@ jobs:
             ${{ steps.meta.outputs.image }}:latest
           labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
 
+      # GHCR publishes a new package as private, and the cluster has no pull
+      # secret. Fail here, before Argo CD sees the tag, instead of leaving the
+      # pods in ImagePullBackOff. The fix is a one-time visibility change.
+      - name: Check the image is publicly pullable
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          repo="${IMAGE#ghcr.io/}"
+          # A private package is refused at the token endpoint already; keep going
+          # with an empty token so the manifest request reports the status.
+          token=$(curl -sS "https://ghcr.io/token?scope=repository:${repo}:pull" | jq -r '.token // empty')
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${token}" \
+            -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json' \
+            "https://ghcr.io/v2/${repo}/manifests/${TAG}")
+          if [ "$code" != "200" ]; then
+            echo "::error::${IMAGE}:${TAG} is not publicly pullable (HTTP ${code}). Open the package on GitHub > Package settings > Change visibility > Public, then re-run this workflow."
+            exit 1
+          fi
+
       - name: Point the manifests at the new image
         env:
           IMAGE: ${{ steps.meta.outputs.image }}

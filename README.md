@@ -32,6 +32,8 @@ Deploys are GitOps, following the [cnh-starter](https://github.com/skyhook-io/cn
 2. Argo CD, inside the team's Radar cluster, syncs `deploy/` into namespace `team-kubecompass`. The Argo CD Application in `argocd/application.yaml` is applied once through Radar's MCP server.
 3. The app is served at https://kubecompass.cnh.radarhq.io.
 
+The image must be public, because the cluster has no registry credentials. GHCR creates a new package as private, so after the first build open the package on GitHub, then Package settings > Change visibility > Public, and re-run the workflow. The workflow checks anonymous pulls and refuses to point the manifests at an image the cluster can't fetch.
+
 Credentials never go in git. Create the Secret `app-credentials` in namespace `team-kubecompass` by hand (for example in Radar's resource editor) with the keys `elasticsearch-url` and `elasticsearch-api-key`. The Deployment reads them through `secretKeyRef`.
 
 To try the image locally: `docker build -t kubecompass . && docker run --rm -p 8080:8080 --env-file .env kubecompass`.
