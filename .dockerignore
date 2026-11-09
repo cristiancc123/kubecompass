@@ -1,0 +1,15 @@
+# Kept out of the image build context.
+.git
+.github
+**/node_modules
+dist
+data
+test
+deploy
+argocd
+**/*kubeconfig*
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+HANDOFF.md
