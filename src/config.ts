@@ -31,6 +31,19 @@ export interface TelemetryConfig {
   dataset?: string;
 }
 
+/** A positive integer, or the fallback when unset. Anything else fails at startup. */
+function positiveInt(env: NodeJS.ProcessEnv, name: string, fallback: number): number {
+  const raw = env[name];
+  if (raw === undefined || raw === "") {
+    return fallback;
+  }
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`${name} must be a positive integer, got "${raw}"`);
+  }
+  return value;
+}
+
 function required(env: NodeJS.ProcessEnv, name: string): string {
   const value = env[name];
   if (!value) {
@@ -61,7 +74,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       ? {
           anthropicApiKey: env.ANTHROPIC_API_KEY,
           model: env.ASK_MODEL || "claude-opus-5-5",
-          limitPerMinute: Number(env.ASK_LIMIT_PER_MINUTE ?? 20),
+          limitPerMinute: positiveInt(env, "ASK_LIMIT_PER_MINUTE", 20),
         }
       : undefined,
   };
