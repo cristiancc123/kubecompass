@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp, parseSearchQuery } from "../src/app.js";
 import type { SearchBackend, SearchQuery, SearchResult } from "../src/search.js";
+import { fakePeople } from "./fakes.js";
 
 const emptyFacets = { day: [], track: [], level: [], venue: [] };
 
@@ -46,24 +47,28 @@ function fakeBackend(overrides: Partial<SearchBackend> = {}): SearchBackend {
 
 describe("probes", () => {
   it("answers the liveness probe", async () => {
-    const res = await createApp({ search: fakeBackend() }).request("/healthz");
+    const res = await createApp({ people: fakePeople(), search: fakeBackend() }).request("/healthz");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ status: "ok", version: "dev" });
   });
 
   it("reports the deployed version on the liveness probe", async () => {
-    const res = await createApp({ search: fakeBackend(), version: "1fe4b61" }).request("/healthz");
+    const res = await createApp({ people: fakePeople(), search: fakeBackend(), version: "1fe4b61" }).request(
+      "/healthz",
+    );
     expect(await res.json()).toEqual({ status: "ok", version: "1fe4b61" });
   });
 
   it("reports readiness when Elasticsearch answers", async () => {
-    const res = await createApp({ search: fakeBackend() }).request("/readyz");
+    const res = await createApp({ people: fakePeople(), search: fakeBackend() }).request("/readyz");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ status: "ok", elasticsearch: "reachable" });
   });
 
   it("reports degraded readiness when the ping resolves to false", async () => {
-    const res = await createApp({ search: fakeBackend({ ping: async () => false }) }).request("/readyz");
+    const res = await createApp({ people: fakePeople(), search: fakeBackend({ ping: async () => false }) }).request(
+      "/readyz",
+    );
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ status: "degraded", elasticsearch: "unreachable" });
   });
@@ -74,7 +79,7 @@ describe("probes", () => {
         throw new Error("connection refused");
       },
     });
-    const res = await createApp({ search: backend }).request("/readyz");
+    const res = await createApp({ people: fakePeople(), search: backend }).request("/readyz");
     expect(res.status).toBe(503);
     expect(await res.json()).toMatchObject({ status: "degraded", elasticsearch: "connection refused" });
   });
@@ -97,7 +102,7 @@ describe("parseSearchQuery", () => {
 describe("GET /api/search", () => {
   it("returns the backend result as JSON", async () => {
     const searchSessions = vi.fn(async (query: SearchQuery) => sampleResult(query));
-    const res = await createApp({ search: fakeBackend({ searchSessions }) }).request(
+    const res = await createApp({ people: fakePeople(), search: fakeBackend({ searchSessions }) }).request(
       "/api/search?q=tracing&track=Observability",
     );
     expect(res.status).toBe(200);
@@ -108,7 +113,9 @@ describe("GET /api/search", () => {
   });
 
   it("rejects invalid input with 400", async () => {
-    const res = await createApp({ search: fakeBackend() }).request(`/api/search?q=${"x".repeat(301)}`);
+    const res = await createApp({ people: fakePeople(), search: fakeBackend() }).request(
+      `/api/search?q=${"x".repeat(301)}`,
+    );
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ error: expect.stringContaining("300") });
   });
@@ -119,7 +126,7 @@ describe("GET /api/search", () => {
         throw new Error("secret internal detail");
       },
     });
-    const res = await createApp({ search: backend }).request("/api/search?q=x");
+    const res = await createApp({ people: fakePeople(), search: backend }).request("/api/search?q=x");
     expect(res.status).toBe(502);
     expect(JSON.stringify(await res.json())).not.toContain("secret internal detail");
   });
@@ -127,7 +134,9 @@ describe("GET /api/search", () => {
 
 describe("GET /", () => {
   it("renders results with escaped HTML and Mountain Time slots", async () => {
-    const res = await createApp({ search: fakeBackend() }).request("/?q=tracing&track=Observability");
+    const res = await createApp({ people: fakePeople(), search: fakeBackend() }).request(
+      "/?q=tracing&track=Observability",
+    );
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
@@ -139,7 +148,7 @@ describe("GET /", () => {
 
   it("shows a short schedule on the landing page", async () => {
     const searchSessions = vi.fn(async (query: SearchQuery) => sampleResult(query));
-    const res = await createApp({ search: fakeBackend({ searchSessions }) }).request("/");
+    const res = await createApp({ people: fakePeople(), search: fakeBackend({ searchSessions }) }).request("/");
     expect(res.status).toBe(200);
     expect(searchSessions).toHaveBeenCalledWith({ q: "", size: 10 });
   });
@@ -150,7 +159,7 @@ describe("GET /", () => {
         throw new Error("boom");
       },
     });
-    const res = await createApp({ search: backend }).request("/?q=x");
+    const res = await createApp({ people: fakePeople(), search: backend }).request("/?q=x");
     expect(res.status).toBe(502);
     expect(await res.text()).toContain('role="alert"');
   });

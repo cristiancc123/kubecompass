@@ -108,13 +108,59 @@ export function renderPage({ query, result, error }: PageModel): string {
       ? renderResults(query, result)
       : "";
 
+  const content = `<form method="get" action="/" role="search">
+      <div class="row">
+        <label for="q">What are you looking for?
+          <input id="q" name="q" type="search" maxlength="300" placeholder="something on eBPF and security after lunch" value="${escapeHtml(query.q)}" autofocus />
+        </label>
+        <button type="submit">Search</button>
+      </div>
+      <div class="filters">
+        <label for="day">Day<select id="day" name="day"><option value="">Any day</option>${renderOptions(facets.day, query.day, formatDay)}</select></label>
+        <label for="track">Track<select id="track" name="track"><option value="">Any track</option>${renderOptions(facets.track, query.track, (v) => v)}</select></label>
+        <label for="level">Level<select id="level" name="level"><option value="">Any level</option>${renderOptions(facets.level, query.level, (v) => v)}</select></label>
+        <label for="venue">Venue<select id="venue" name="venue"><option value="">Any venue</option>${renderOptions(facets.venue, query.venue, (v) => v)}</select></label>
+      </div>
+    </form>
+    <section id="results" aria-live="polite">${body}</section>`;
+
+  return renderLayout({
+    title: "kubecompass · find the right talk at KubeCon",
+    description: "Hybrid keyword and semantic search over the KubeCon + CloudNativeCon North America 2026 schedule.",
+    current: "talks",
+    tagline: "Find the right talk at KubeCon + CloudNativeCon North America 2026, Salt Lake City. Ask in plain words.",
+    skipTarget: "results",
+    content,
+    footer:
+      "Schedule data from the official KubeCon program. Times in Mountain Standard Time. Search by Elasticsearch, hybrid BM25 + semantic retrieval.",
+  });
+}
+
+export interface LayoutModel {
+  /** Text for the <title> element. */
+  title: string;
+  description: string;
+  /** Which navigation link is the current page. */
+  current: "talks" | "people";
+  tagline: string;
+  /** Id of the main region the skip link jumps to. */
+  skipTarget: string;
+  /** Trusted HTML: every value inside must already be escaped. */
+  content: string;
+  footer: string;
+}
+
+/** Shared page shell: theme, navigation, skip link and footer. */
+export function renderLayout(page: LayoutModel): string {
+  const navLink = (key: LayoutModel["current"], href: string, label: string) =>
+    `<a href="${href}"${page.current === key ? ' aria-current="page"' : ""}>${label}</a>`;
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>kubecompass · find the right talk at KubeCon</title>
-  <meta name="description" content="Hybrid keyword and semantic search over the KubeCon + CloudNativeCon North America 2026 schedule." />
+  <title>${escapeHtml(page.title)}</title>
+  <meta name="description" content="${escapeHtml(page.description)}" />
   <style>
     :root { --bg: #0b1020; --panel: #121a2f; --text: #e8ecf5; --muted: #a9b3c9; --accent: #5ad1ff; --accent-2: #a78bfa; --on-accent: #041018; --error: #fca5a5; --border: #27324d; }
     @media (prefers-color-scheme: light) { :root { --bg: #f7f8fb; --panel: #ffffff; --text: #111827; --muted: #4b5563; --accent: #0369a1; --accent-2: #6d28d9; --on-accent: #ffffff; --error: #b91c1c; --border: #d7dce6; } }
@@ -143,32 +189,29 @@ export function renderPage({ query, result, error }: PageModel): string {
     .tags { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
     .tags li { font-size: 0.8rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
     footer { max-width: 960px; margin: 40px auto; padding: 0 16px; color: var(--muted); font-size: 0.85rem; }
+    nav { display: flex; gap: 16px; margin: 8px 0 0; }
+    nav a { font-weight: 600; text-decoration: none; padding: 2px 0; }
+    nav a[aria-current="page"] { text-decoration: underline; text-underline-offset: 6px; text-decoration-thickness: 2px; }
+    textarea { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); min-height: 7rem; resize: vertical; }
+    textarea:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 2px; }
+    .hint { font-size: 0.85rem; color: var(--muted); margin: 0; }
+    .notice { background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; padding: 12px 16px; margin: 0 0 16px; }
+    h2.section { font-size: 1.25rem; margin: 32px 0 12px; }
+    .contact { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem; }
+    button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
   </style>
 </head>
 <body>
-  <a class="skip" href="#results">Skip to results</a>
+  <a class="skip" href="#${escapeHtml(page.skipTarget)}">Skip to main content</a>
   <header>
     <h1>kube<span>compass</span></h1>
-    <p class="tagline">Find the right talk at KubeCon + CloudNativeCon North America 2026, Salt Lake City. Ask in plain words.</p>
+    <nav aria-label="Main">${navLink("talks", "/", "Talks")}${navLink("people", "/people", "Hallway track")}</nav>
+    <p class="tagline">${escapeHtml(page.tagline)}</p>
   </header>
   <main>
-    <form method="get" action="/" role="search">
-      <div class="row">
-        <label for="q">What are you looking for?
-          <input id="q" name="q" type="search" maxlength="300" placeholder="something on eBPF and security after lunch" value="${escapeHtml(query.q)}" autofocus />
-        </label>
-        <button type="submit">Search</button>
-      </div>
-      <div class="filters">
-        <label for="day">Day<select id="day" name="day"><option value="">Any day</option>${renderOptions(facets.day, query.day, formatDay)}</select></label>
-        <label for="track">Track<select id="track" name="track"><option value="">Any track</option>${renderOptions(facets.track, query.track, (v) => v)}</select></label>
-        <label for="level">Level<select id="level" name="level"><option value="">Any level</option>${renderOptions(facets.level, query.level, (v) => v)}</select></label>
-        <label for="venue">Venue<select id="venue" name="venue"><option value="">Any venue</option>${renderOptions(facets.venue, query.venue, (v) => v)}</select></label>
-      </div>
-    </form>
-    <section id="results" aria-live="polite">${body}</section>
+    ${page.content}
   </main>
-  <footer>Schedule data from the official KubeCon program. Times in Mountain Standard Time. Search by Elasticsearch, hybrid BM25 + semantic retrieval.</footer>
+  <footer>${escapeHtml(page.footer)}</footer>
 </body>
 </html>`;
 }

@@ -13,7 +13,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "ingest": "node --env-file=.env --import tsx scripts/ingest.ts"
+    "ingest": "node --env-file=.env --import tsx scripts/ingest.ts",
+    "setup-attendees": "node --env-file=.env --import tsx scripts/setup-attendees.ts"
   },
   "dependencies": {
     "@elastic/elasticsearch": "^9.1.0",

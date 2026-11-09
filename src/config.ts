@@ -7,6 +7,7 @@ export interface Config {
   elasticsearchUrl: string;
   elasticsearchApiKey: string;
   sessionsIndex: string;
+  attendeesIndex: string;
   /** Image tag set at build time; "dev" when running from source. */
   appVersion: string;
   /** Present only when both Dash0 values are set, so local runs work without telemetry. */
@@ -44,6 +45,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     elasticsearchUrl: required(env, "ELASTICSEARCH_URL"),
     elasticsearchApiKey: required(env, "ELASTICSEARCH_API_KEY"),
     sessionsIndex: env.SESSIONS_INDEX ?? "kubecon-sessions",
+    attendeesIndex: env.ATTENDEES_INDEX ?? "kubecon-attendees",
     appVersion: env.APP_VERSION ?? "dev",
     telemetry: telemetryConfig(env),
   };
