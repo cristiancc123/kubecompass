@@ -60,6 +60,19 @@ describe("createReadinessMonitor", () => {
     expect(infos).toHaveBeenCalledWith("readiness: Elasticsearch reachable");
   });
 
+  it("doesn't start a new ping while a timed-out one is still running", async () => {
+    let resolve!: (value: boolean) => void;
+    const ping = vi.fn(() => new Promise<boolean>((r) => (resolve = r)));
+    const monitor = createReadinessMonitor(ping, { timeoutMs: 10 });
+    await monitor.check();
+    await monitor.check();
+    expect(ping).toHaveBeenCalledTimes(1);
+    resolve(true);
+    await new Promise((r) => setTimeout(r, 0));
+    await monitor.check();
+    expect(ping).toHaveBeenCalledTimes(2);
+  });
+
   it("never runs two checks at once", async () => {
     let resolve!: (value: boolean) => void;
     const ping = vi.fn(() => new Promise<boolean>((r) => (resolve = r)));

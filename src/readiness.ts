@@ -6,7 +6,7 @@ export interface Readiness {
 }
 
 export interface ReadinessMonitor extends Readiness {
-  /** Runs one check now. Skipped while another check is still in flight. */
+  /** Runs one check now. Skipped while an earlier ping, even a timed-out one, is still running. */
   check(): Promise<void>;
   /** Checks immediately and then on the interval. Returns a function that stops it. */
   start(): () => void;
@@ -42,22 +42,27 @@ export function createReadinessMonitor(
 ): ReadinessMonitor {
   let lastSuccessAt: number | undefined;
   let lastCheckOk: boolean | undefined;
-  let inFlight = false;
+  // The ping itself, not the timeout race: a timed-out ping keeps running, and
+  // starting another one before it settles would pile up requests on a slow
+  // Elasticsearch.
+  let pending: Promise<unknown> | undefined;
 
   async function check(): Promise<void> {
-    if (inFlight) {
+    if (pending) {
       return;
     }
-    inFlight = true;
+    const attempt = ping();
+    pending = attempt.then(
+      () => (pending = undefined),
+      () => (pending = undefined),
+    );
     let failure: unknown;
     try {
-      if (!(await withTimeout(ping(), timeoutMs))) {
+      if (!(await withTimeout(attempt, timeoutMs))) {
         failure = new Error("Elasticsearch ping returned false");
       }
     } catch (error) {
       failure = error;
-    } finally {
-      inFlight = false;
     }
     const ok = failure === undefined;
     if (ok) {
