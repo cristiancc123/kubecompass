@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { createAskBackend } from "../src/ask.js";
 import type { SearchBackend, SessionHit } from "../src/search.js";
+import type { StudyBackend } from "../src/study.js";
 import { alwaysReady, fakePeople, SAMPLE_ID } from "./fakes.js";
 
 const hit: SessionHit = {
@@ -51,6 +52,22 @@ const empty: SearchBackend = {
   }),
 };
 
+const study: StudyBackend = {
+  getSession: async (id) => (id === hit.id ? hit : null),
+  study: async () => ({
+    refused: false,
+    guide: {
+      keyIdeas: ["Tracing at scale needs sampling", "Pipelines need backpressure", "Measure before tuning"],
+      review: [{ question: "Why sample?", answer: "Volume." }],
+      challenge: {
+        title: "Run a collector",
+        steps: ["Create a kind cluster", "Install the collector"],
+        doneWhen: "Spans arrive",
+      },
+    },
+  }),
+};
+
 const ask = createAskBackend(search, {
   generate: async () => ({ text: "Start with Tracing at Scale [1].", refused: false }),
 });
@@ -86,6 +103,12 @@ const pages: Array<[string, () => ReturnType<typeof createApp>, string, RequestI
     "profile",
     () => createApp({ search, people: fakePeople(), readiness: alwaysReady }),
     `/people/${SAMPLE_ID}?created=1`,
+  ],
+  ["study form", () => createApp({ search, people: fakePeople(), readiness: alwaysReady, study }), "/talks/1/study"],
+  [
+    "study guide",
+    () => createApp({ search, people: fakePeople(), readiness: alwaysReady, study }),
+    "/talks/1/study?lang=es&go=1",
   ],
   ["profile not found", () => createApp({ search, people: fakePeople(), readiness: alwaysReady }), "/people/unknown"],
 ];

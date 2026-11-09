@@ -71,6 +71,7 @@ function renderTalk(hit: SessionHit): string {
   return `<li class="card">
   <h3><a href="${escapeHtml(hit.url)}" rel="noopener" target="_blank">${escapeHtml(hit.title)}</a></h3>
   <p class="meta"><time datetime="${escapeHtml(hit.start)}">${escapeHtml(formatSlot(hit.start, hit.end))}</time> · ${escapeHtml(hit.room || "Room to be announced")}</p>
+  <p class="study-link"><a href="/talks/${escapeHtml(hit.id)}/study">Study this talk<span class="visually-hidden">: ${escapeHtml(hit.title)}</span></a></p>
 </li>`;
 }
 

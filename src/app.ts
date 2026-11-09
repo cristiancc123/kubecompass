@@ -8,6 +8,8 @@ import { log } from "./log.js";
 import { renderPeopleForm, renderPeopleMessage, renderProfile } from "./people-ui.js";
 import type { Readiness } from "./readiness.js";
 import { redactUrl } from "./redact.js";
+import { pickLanguage, pickLevel, renderStudyPage } from "./study-ui.js";
+import type { StudyBackend } from "./study.js";
 import { parseAttendeeInput, type PeopleBackend } from "./people.js";
 import { MAX_QUERY_LENGTH, type SearchBackend, type SearchQuery } from "./search.js";
 import { SERVICE_NAME } from "./telemetry.js";
@@ -19,8 +21,10 @@ export interface AppDependencies {
   readiness: Readiness;
   /** Absent when no model is configured; /ask then explains that. */
   ask?: AskBackend;
-  /** Shared budget for /ask. Each question costs a model call. */
+  /** Shared budget for /ask and study guides. Each one costs a model call. */
   askLimiter?: { tryAcquire(): boolean };
+  /** Absent when no model is configured; the study page then says so. */
+  study?: StudyBackend;
   /** Reported by /healthz so a deploy can be matched to its image tag. */
   version?: string;
 }
@@ -151,6 +155,44 @@ export function createApp(deps: AppDependencies): Hono {
       log.error("ask failed", error);
       const message = "The assistant is temporarily unavailable. Try again in a moment, or search the talks directly.";
       return c.html(renderAskPage({ question, error: message, available }), 502);
+    }
+  });
+
+  app.get("/talks/:id/study", async (c) => {
+    if (!deps.study) {
+      trace.getActiveSpan()?.setAttribute("kubecompass.study.refused_reason", "not_configured");
+      return c.html(renderPeopleMessage("The study assistant is not configured on this deployment."), 503);
+    }
+    let session;
+    try {
+      session = await deps.study.getSession(c.req.param("id"));
+    } catch (error) {
+      log.error("get session failed", error);
+      return c.html(renderPeopleMessage("Sessions are temporarily unavailable. Try again in a moment."), 502);
+    }
+    if (!session) {
+      return c.html(renderPeopleMessage("This session doesn't exist. Search the talks to find it."), 404);
+    }
+    const level = pickLevel(c.req.query("level"));
+    const language = pickLanguage(c.req.query("lang"), c.req.header("accept-language"));
+    const page = { session, level, language, available: true };
+    // Generating costs a model call, so it only happens when the form is submitted.
+    if (c.req.query("go") !== "1") {
+      return c.html(renderStudyPage(page));
+    }
+    if (deps.askLimiter && !deps.askLimiter.tryAcquire()) {
+      trace.getActiveSpan()?.setAttribute("kubecompass.study.refused_reason", "rate_limited");
+      return c.html(renderStudyPage({ ...page, error: "Lots of requests right now. Try again in a minute." }), 429);
+    }
+    try {
+      const result = await deps.study.study(session, level, language);
+      return c.html(renderStudyPage({ ...page, result }));
+    } catch (error) {
+      log.error("study failed", error);
+      return c.html(
+        renderStudyPage({ ...page, error: "The study assistant is temporarily unavailable. Try again in a moment." }),
+        502,
+      );
     }
   });
 
