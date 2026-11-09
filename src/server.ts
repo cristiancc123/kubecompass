@@ -3,6 +3,7 @@ import { createApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { createElasticsearchClient } from "./es.js";
 import { log } from "./log.js";
+import { createPeopleBackend } from "./people.js";
 import { createSearchBackend } from "./search.js";
 import { startTelemetry } from "./telemetry.js";
 
@@ -10,7 +11,11 @@ const config = loadConfig();
 // Start telemetry before anything takes a tracer or meter from the global API.
 const stopTelemetry = startTelemetry(config);
 const es = createElasticsearchClient(config);
-const app = createApp({ search: createSearchBackend(es, config.sessionsIndex), version: config.appVersion });
+const app = createApp({
+  search: createSearchBackend(es, config.sessionsIndex),
+  people: createPeopleBackend(es, config.attendeesIndex),
+  version: config.appVersion,
+});
 
 const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
   log.info(`kubecompass ${config.appVersion} listening on http://localhost:${info.port}`, {

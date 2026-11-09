@@ -18,7 +18,11 @@ export const log = {
     console.error(message, error);
     const details =
       error instanceof Error
-        ? { "exception.type": error.name, "exception.message": error.message, "exception.stacktrace": error.stack ?? "" }
+        ? {
+            "exception.type": error.name,
+            "exception.message": error.message,
+            "exception.stacktrace": error.stack ?? "",
+          }
         : { "exception.message": String(error) };
     emit(SeverityNumber.ERROR, "ERROR", message, { ...attributes, ...details });
   },

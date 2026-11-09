@@ -1,12 +1,16 @@
 import { httpInstrumentationMiddleware } from "@hono/otel";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { log } from "./log.js";
+import { renderPeopleForm, renderPeopleMessage, renderProfile } from "./people-ui.js";
+import { parseAttendeeInput, type PeopleBackend } from "./people.js";
 import { MAX_QUERY_LENGTH, type SearchBackend, type SearchQuery } from "./search.js";
 import { SERVICE_NAME } from "./telemetry.js";
 import { renderPage } from "./ui.js";
 
 export interface AppDependencies {
   search: SearchBackend;
+  people: PeopleBackend;
   /** Reported by /healthz so a deploy can be matched to its image tag. */
   version?: string;
 }
@@ -14,6 +18,9 @@ export interface AppDependencies {
 const MAX_FILTER_LENGTH = 100;
 const FILTER_PARAMS = ["day", "track", "level", "venue"] as const;
 const LANDING_PAGE_SIZE = 10;
+const TALKS_PER_PROFILE = 5;
+/** The sign-up form is three short fields; anything bigger is not from it. */
+const MAX_FORM_BYTES = 4 * 1024;
 
 export type ParsedQuery = { ok: true; query: SearchQuery } | { ok: false; error: string };
 
@@ -113,6 +120,80 @@ export function createApp(deps: AppDependencies): Hono {
         }),
         502,
       );
+    }
+  });
+
+  app.get("/people", (c) => c.html(renderPeopleForm()));
+
+  app.post(
+    "/people",
+    bodyLimit({
+      maxSize: MAX_FORM_BYTES,
+      onError: (c) => c.html(renderPeopleForm({ error: "That form is too large." }), 413),
+    }),
+    async (c) => {
+      const form = await c.req.parseBody();
+      const parsed = parseAttendeeInput(form);
+      if (!parsed.ok) {
+        const values = {
+          name: String(form.name ?? ""),
+          interests: String(form.interests ?? ""),
+          contact: String(form.contact ?? ""),
+        };
+        return c.html(renderPeopleForm({ values, error: parsed.error }), 400);
+      }
+      try {
+        const attendee = await deps.people.createAttendee(parsed.input);
+        // Post/redirect/get, so a reload doesn't create the profile twice.
+        return c.redirect(`/people/${attendee.id}?created=1`, 303);
+      } catch (error) {
+        log.error("create attendee failed", error);
+        return c.html(
+          renderPeopleForm({ values: parsed.input, error: "Saving your profile failed. Try again in a moment." }),
+          502,
+        );
+      }
+    },
+  );
+
+  app.get("/people/:id", async (c) => {
+    let attendee;
+    try {
+      attendee = await deps.people.getAttendee(c.req.param("id"));
+    } catch (error) {
+      log.error("get attendee failed", error);
+      return c.html(renderPeopleMessage("Profiles are temporarily unavailable. Try again in a moment."), 502);
+    }
+    if (!attendee) {
+      return c.html(renderPeopleMessage("This profile doesn't exist, or it was deleted."), 404);
+    }
+    // Matches and talks are independent: one failing still shows the other.
+    const [matches, talks] = await Promise.all([
+      deps.people.findMatches(attendee).catch((error: unknown) => {
+        log.error("find matches failed", error);
+        return null;
+      }),
+      deps.search
+        .searchSessions({ q: attendee.interests, size: TALKS_PER_PROFILE })
+        .then((result) => result.hits)
+        .catch((error: unknown) => {
+          log.error("talk suggestions failed", error);
+          return null;
+        }),
+    ]);
+    return c.html(renderProfile({ attendee, matches, talks, created: c.req.query("created") === "1" }));
+  });
+
+  app.post("/people/:id/delete", async (c) => {
+    try {
+      const deleted = await deps.people.deleteAttendee(c.req.param("id"));
+      const message = deleted
+        ? "Your profile is deleted. Thanks for joining the hallway track."
+        : "This profile doesn't exist, or it was already deleted.";
+      return c.html(renderPeopleMessage(message), deleted ? 200 : 404);
+    } catch (error) {
+      log.error("delete attendee failed", error);
+      return c.html(renderPeopleMessage("Deleting failed. Try again in a moment."), 502);
     }
   });
 

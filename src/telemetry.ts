@@ -41,7 +41,9 @@ export function startTelemetry(config: Config): () => Promise<void> {
         exportIntervalMillis: 15_000,
       }),
     ],
-    logRecordProcessors: [new BatchLogRecordProcessor({ exporter: new OTLPLogExporter({ url: url("logs"), headers }) })],
+    logRecordProcessors: [
+      new BatchLogRecordProcessor({ exporter: new OTLPLogExporter({ url: url("logs"), headers }) }),
+    ],
     instrumentations: [],
   });
   sdk.start();
