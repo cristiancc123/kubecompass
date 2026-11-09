@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildFilters, buildSearchRequest, clampSize, DEFAULT_SIZE, MAX_SIZE } from "../src/search.js";
+import {
+  buildFilters,
+  buildSearchRequest,
+  clampSize,
+  DEFAULT_SIZE,
+  facetAggregations,
+  MAX_SIZE,
+} from "../src/search.js";
 import { escapeHtml, formatDay, formatSlot, truncate } from "../src/ui.js";
 
 describe("clampSize", () => {
@@ -21,6 +28,18 @@ describe("buildFilters", () => {
   });
 });
 
+describe("facetAggregations", () => {
+  it("counts each facet under the other filters but not its own", () => {
+    const aggs = facetAggregations({ track: "Security", day: "2026-11-10" }).facets.aggs ?? {};
+    expect(aggs.track.filter).toEqual({ bool: { filter: [{ term: { day: "2026-11-10" } }] } });
+    expect(aggs.day.filter).toEqual({ bool: { filter: [{ term: { track: "Security" } }] } });
+    expect(aggs.level.filter).toEqual({
+      bool: { filter: [{ term: { day: "2026-11-10" } }, { term: { track: "Security" } }] },
+    });
+    expect(aggs.track.aggs?.values.terms?.field).toBe("track");
+  });
+});
+
 describe("buildSearchRequest", () => {
   it("browses in schedule order when there is no text", () => {
     const request = buildSearchRequest("sessions", { q: "  ", day: "2026-11-10" });
@@ -29,7 +48,7 @@ describe("buildSearchRequest", () => {
     expect(request.query).toEqual({ bool: { filter: [{ term: { day: "2026-11-10" } }] } });
     expect(request.sort).toEqual([{ start: "asc" }]);
     expect(request.retriever).toBeUndefined();
-    expect(request.aggs).toHaveProperty("track");
+    expect(request.aggs?.facets?.global).toEqual({});
     expect(request._source).not.toContain("content");
   });
 

@@ -116,8 +116,8 @@ export function renderPage({ query, result, error }: PageModel): string {
   <title>kubecompass · find the right talk at KubeCon</title>
   <meta name="description" content="Hybrid keyword and semantic search over the KubeCon + CloudNativeCon North America 2026 schedule." />
   <style>
-    :root { --bg: #0b1020; --panel: #121a2f; --text: #e8ecf5; --muted: #a9b3c9; --accent: #5ad1ff; --accent-2: #a78bfa; --border: #27324d; }
-    @media (prefers-color-scheme: light) { :root { --bg: #f7f8fb; --panel: #ffffff; --text: #111827; --muted: #4b5563; --accent: #0369a1; --accent-2: #6d28d9; --border: #d7dce6; } }
+    :root { --bg: #0b1020; --panel: #121a2f; --text: #e8ecf5; --muted: #a9b3c9; --accent: #5ad1ff; --accent-2: #a78bfa; --on-accent: #041018; --error: #fca5a5; --border: #27324d; }
+    @media (prefers-color-scheme: light) { :root { --bg: #f7f8fb; --panel: #ffffff; --text: #111827; --muted: #4b5563; --accent: #0369a1; --accent-2: #6d28d9; --on-accent: #ffffff; --error: #b91c1c; --border: #d7dce6; } }
     * { box-sizing: border-box; }
     body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
     a { color: var(--accent); }
@@ -132,9 +132,9 @@ export function renderPage({ query, result, error }: PageModel): string {
     .filters { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
     label { display: grid; gap: 4px; font-size: 0.9rem; color: var(--muted); }
     input, select, button { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
-    button { background: var(--accent); color: #041018; border-color: transparent; font-weight: 600; cursor: pointer; }
+    button { background: var(--accent); color: var(--on-accent); border-color: transparent; font-weight: 600; cursor: pointer; }
     .summary, .empty, .error { margin: 24px 0 12px; color: var(--muted); }
-    .error { color: #fca5a5; }
+    .error { color: var(--error); }
     .results { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
     .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
     .card h2 { margin: 0 0 6px; font-size: 1.15rem; }

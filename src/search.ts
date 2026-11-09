@@ -89,13 +89,27 @@ export function buildFilters(filters: SearchFilters): estypes.QueryDslQueryConta
   return clauses;
 }
 
-function facetAggregations(): Record<string, estypes.AggregationsAggregationContainer> {
-  return {
-    day: { terms: { field: "day", size: 10, order: { _key: "asc" } } },
-    track: { terms: { field: "track", size: 50 } },
-    level: { terms: { field: "level", size: 10 } },
-    venue: { terms: { field: "venue", size: 10 } },
-  };
+const FACET_TERMS: Record<(typeof FACET_FIELDS)[number], estypes.AggregationsTermsAggregation> = {
+  day: { field: "day", size: 10, order: { _key: "asc" } },
+  track: { field: "track", size: 50 },
+  level: { field: "level", size: 10 },
+  venue: { field: "venue", size: 10 },
+};
+
+/**
+ * Each facet is counted under every selected filter except its own, so choosing
+ * a track still lists the other tracks. The global aggregation ignores the free
+ * text: counts describe the schedule, not the ranked hits.
+ */
+export function facetAggregations(filters: SearchFilters): Record<string, estypes.AggregationsAggregationContainer> {
+  const perFacet: Record<string, estypes.AggregationsAggregationContainer> = {};
+  for (const field of FACET_FIELDS) {
+    perFacet[field] = {
+      filter: { bool: { filter: buildFilters({ ...filters, [field]: undefined }) } },
+      aggs: { values: { terms: FACET_TERMS[field] } },
+    };
+  }
+  return { facets: { global: {}, aggs: perFacet } };
 }
 
 /**
@@ -112,7 +126,7 @@ export function buildSearchRequest(index: string, query: SearchQuery): estypes.S
     index,
     size,
     _source: SOURCE_FIELDS,
-    aggs: facetAggregations(),
+    aggs: facetAggregations(query),
   };
 
   if (!text) {
@@ -158,10 +172,12 @@ export function buildSearchRequest(index: string, query: SearchQuery): estypes.S
   };
 }
 
+type FacetsAggregate = Record<string, { values?: estypes.AggregationsStringTermsAggregate }>;
+
 function readFacets(aggregations: Record<string, estypes.AggregationsAggregate> | undefined): SearchFacets {
+  const facets = aggregations?.facets as unknown as FacetsAggregate | undefined;
   const read = (name: (typeof FACET_FIELDS)[number]): FacetBucket[] => {
-    const agg = aggregations?.[name] as estypes.AggregationsStringTermsAggregate | undefined;
-    const buckets = agg?.buckets;
+    const buckets = facets?.[name]?.values?.buckets;
     if (!Array.isArray(buckets)) {
       return [];
     }
