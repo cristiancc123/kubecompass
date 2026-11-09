@@ -56,13 +56,13 @@ export function renderAskPage({ question, result, error, available }: AskPageMod
   const content = `<form method="get" action="/ask" role="search">
       <div class="row">
         <label for="q">Ask about the schedule
-          <input id="q" name="q" type="search" maxlength="${MAX_QUESTION_LENGTH}" placeholder="I'm new to platform engineering, what should I see on Tuesday?" value="${escapeHtml(question)}"${disabled} autofocus />
+          <input id="q" name="q" type="search" maxlength="${MAX_QUESTION_LENGTH}" placeholder="I'm new to platform engineering, what should I see on Tuesday?" value="${escapeHtml(question)}"${disabled} />
         </label>
         <button type="submit"${disabled}>Ask</button>
       </div>
       <p class="hint">Answers come from Claude, grounded in the sessions found by hybrid search. Check the linked sessions before you plan your day.</p>
     </form>
-    <section id="answer" aria-live="polite">${body}</section>`;
+    <section id="answer" tabindex="-1" aria-live="polite">${body}</section>`;
   return renderLayout({
     title: "Ask · kubecompass",
     description: "Ask questions about the KubeCon schedule and get answers that cite the sessions.",

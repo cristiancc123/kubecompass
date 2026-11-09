@@ -49,6 +49,15 @@ With `DASH0_OTLP_ENDPOINT` and `DASH0_AUTH_TOKEN` set, the app exports traces, m
 - In Kubernetes, `OTEL_RESOURCE_ATTRIBUTES` adds the pod, namespace, node and cluster to everything the app sends.
 - What people type stays out: spans keep the URL path without the query string, and record query lengths and counts, never the text.
 
+## Accessibility
+
+Every page works without JavaScript and is checked against WCAG 2.2 AA.
+
+- `test/a11y.test.ts` runs axe-core on every page state (results, empty, errors, answers, forms, profiles) in CI, with a self-check that a known violation is caught.
+- Color contrast, which axe can't measure without a browser, was checked by hand for both color schemes: text at least 5.6:1, form control borders at least 3.5:1, focus ring at least 6.3:1.
+- A skip link moves keyboard focus to each page's main region, every control has a visible label and focus ring, and no field steals focus on load.
+- Pages reflow at 390 px wide without horizontal scrolling.
+
 ## AI disclosure
 
 This project was built with the help of AI coding assistants, mainly Claude Code (Anthropic). Every change was reviewed and understood by the author before merging. Gitar reviewed the pull requests.

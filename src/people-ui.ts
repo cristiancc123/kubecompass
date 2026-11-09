@@ -22,7 +22,7 @@ export interface PeopleFormModel {
 export function renderPeopleForm({ values = {}, error }: PeopleFormModel = {}): string {
   const errorBlock = error ? `<p class="error" role="alert" id="form-error">${escapeHtml(error)}</p>` : "";
   const described = error ? ' aria-describedby="form-error"' : "";
-  const content = `<section id="people" aria-labelledby="people-title">
+  const content = `<section id="people" tabindex="-1" aria-labelledby="people-title">
       <h2 class="section" id="people-title">Find your people</h2>
       <p class="notice">What you enter here is shown to the attendees you match with. Leave out anything private. You get a private link to your profile, where you can delete it.</p>
       ${errorBlock}
@@ -112,7 +112,7 @@ export function renderProfile({ attendee, matches, talks, created }: ProfileMode
         ? `<p class="empty">No talks found for these interests.</p>`
         : `<ol class="results">${talks.map(renderTalk).join("\n")}</ol>`;
 
-  const content = `<section id="profile" aria-labelledby="profile-title">
+  const content = `<section id="profile" tabindex="-1" aria-labelledby="profile-title">
       ${welcome}
       <h2 class="section" id="profile-title">Hi, ${escapeHtml(attendee.name)}</h2>
       <p class="desc">${escapeHtml(attendee.interests)}</p>
@@ -145,7 +145,7 @@ export function renderPeopleMessage(message: string): string {
     current: "people",
     tagline: TAGLINE,
     skipTarget: "message",
-    content: `<section id="message"><p class="notice" role="status">${escapeHtml(message)}</p><p><a href="/people">Create a new profile</a></p></section>`,
+    content: `<section id="message" tabindex="-1"><p class="notice" role="status">${escapeHtml(message)}</p><p><a href="/people">Create a new profile</a></p></section>`,
     footer: FOOTER,
   });
 }
