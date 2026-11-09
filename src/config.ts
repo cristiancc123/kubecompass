@@ -10,8 +10,17 @@ export interface Config {
   attendeesIndex: string;
   /** Image tag set at build time; "dev" when running from source. */
   appVersion: string;
+  /** Present only when an Anthropic API key is set; without it /ask is disabled. */
+  ask?: AskConfig;
   /** Present only when both Dash0 values are set, so local runs work without telemetry. */
   telemetry?: TelemetryConfig;
+}
+
+export interface AskConfig {
+  anthropicApiKey: string;
+  model: string;
+  /** Questions per minute per pod. Each one is a paid model call. */
+  limitPerMinute: number;
 }
 
 export interface TelemetryConfig {
@@ -48,5 +57,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     attendeesIndex: env.ATTENDEES_INDEX ?? "kubecon-attendees",
     appVersion: env.APP_VERSION ?? "dev",
     telemetry: telemetryConfig(env),
+    ask: env.ANTHROPIC_API_KEY
+      ? {
+          anthropicApiKey: env.ANTHROPIC_API_KEY,
+          model: env.ASK_MODEL || "claude-opus-5-5",
+          limitPerMinute: Number(env.ASK_LIMIT_PER_MINUTE ?? 20),
+        }
+      : undefined,
   };
 }
