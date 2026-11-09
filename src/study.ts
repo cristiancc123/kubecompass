@@ -135,6 +135,28 @@ export function createAnthropicStudyGenerator(client: Anthropic, model: string):
   };
 }
 
+/** Sessions by schedule id, read in real time. Unknown or malformed ids resolve to null. */
+export function createSessionLookup(es: Client, index: string): (id: string) => Promise<Session | null> {
+  return async (id) => {
+    if (!isSessionId(id)) {
+      return null;
+    }
+    try {
+      const response = await es.get<Session & { content?: string }>({ index, id });
+      if (!response._source) {
+        return null;
+      }
+      const { content: _embedded, ...session } = response._source;
+      return session;
+    } catch (error) {
+      if ((error as { meta?: { statusCode?: number } } | null)?.meta?.statusCode === 404) {
+        return null;
+      }
+      throw error;
+    }
+  };
+}
+
 /**
  * Looks sessions up by id in real time and wraps generation in a span that
  * records the level and language, never the content.
@@ -142,24 +164,7 @@ export function createAnthropicStudyGenerator(client: Anthropic, model: string):
 export function createStudyBackend(es: Client, index: string, generator: StudyGenerator): StudyBackend {
   const tracer = trace.getTracer("kubecompass.study");
   return {
-    async getSession(id) {
-      if (!isSessionId(id)) {
-        return null;
-      }
-      try {
-        const response = await es.get<Session & { content?: string }>({ index, id });
-        if (!response._source) {
-          return null;
-        }
-        const { content: _embedded, ...session } = response._source;
-        return session;
-      } catch (error) {
-        if ((error as { meta?: { statusCode?: number } } | null)?.meta?.statusCode === 404) {
-          return null;
-        }
-        throw error;
-      }
-    },
+    getSession: createSessionLookup(es, index),
     study(session, level, language) {
       return tracer.startActiveSpan("study session", async (span) => {
         span.setAttributes({ "kubecompass.study.level": level, "kubecompass.study.language": language });

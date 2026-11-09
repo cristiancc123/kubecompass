@@ -8,7 +8,7 @@ import { log } from "./log.js";
 import { createPeopleBackend } from "./people.js";
 import { createReadinessMonitor } from "./readiness.js";
 import { createSearchBackend } from "./search.js";
-import { createAnthropicStudyGenerator, createStudyBackend } from "./study.js";
+import { createAnthropicStudyGenerator, createSessionLookup, createStudyBackend } from "./study.js";
 import { startTelemetry } from "./telemetry.js";
 
 const config = loadConfig();
@@ -30,6 +30,7 @@ const app = createApp({
   readiness,
   ask,
   study,
+  sessions: createSessionLookup(es, config.sessionsIndex),
   askLimiter: config.ask ? createRateLimiter(config.ask.limitPerMinute, 60_000) : undefined,
   people: createPeopleBackend(es, config.attendeesIndex),
   version: config.appVersion,

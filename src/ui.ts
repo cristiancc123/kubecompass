@@ -209,13 +209,55 @@ export function renderLayout(page: LayoutModel): string {
     .ideas { margin: 0; padding: 16px 16px 16px 36px; display: grid; gap: 8px; }
     .steps { margin: 0; padding: 0 0 0 20px; display: grid; gap: 8px; }
     details summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+    /* ---- Visual layer: depth, color and friendlier controls. Contrast checked in both schemes. ---- */
+    body { background: radial-gradient(1200px 600px at 10% -10%, color-mix(in srgb, var(--accent-2) 18%, transparent), transparent 60%), radial-gradient(900px 500px at 100% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 55%), var(--bg); background-attachment: fixed; min-height: 100vh; }
+    header { padding-top: 40px; padding-bottom: 8px; }
+    h1 { font-size: clamp(2rem, 5vw, 2.8rem); letter-spacing: -0.02em; }
+    h1 span:not(.logo) { background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    h1 .logo { font-size: 0.85em; }
+    .tagline { font-size: 1.05rem; }
+    nav { gap: 8px; margin: 16px 0 0; flex-wrap: wrap; }
+    nav a { padding: 8px 16px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); color: var(--text); transition: border-color .15s, background .15s; }
+    nav a:hover { border-color: var(--accent); }
+    nav a[aria-current="page"] { background: linear-gradient(90deg, var(--accent), var(--accent-2)); color: var(--on-accent); border-color: transparent; text-decoration: none; }
+    form, .card, .notice { box-shadow: 0 1px 2px rgb(0 0 0 / 12%), 0 8px 24px rgb(0 0 0 / 10%); }
+    form { border-radius: 16px; padding: 20px; }
+    .card { border-radius: 16px; padding: 18px 20px; transition: transform .15s ease, border-color .15s ease; }
+    .results > .card:hover { transform: translateY(-2px); border-color: var(--accent); }
+    .card h2, .card h3 { font-size: 1.2rem; line-height: 1.3; }
+    .card h2 a, .card h3 a { text-decoration: none; }
+    .card h2 a:hover, .card h3 a:hover { text-decoration: underline; }
+    button { background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 10px; padding: 10px 18px; box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 30%, transparent); }
+    button:hover { filter: brightness(1.06); }
+    input, select, textarea { border-radius: 10px; }
+    select { width: 100%; min-width: 0; }
+    .tags li { background: color-mix(in srgb, var(--accent) 10%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); color: var(--text); }
+    .tags li:first-child { background: color-mix(in srgb, var(--accent-2) 16%, var(--panel)); border-color: color-mix(in srgb, var(--accent-2) 45%, var(--border)); }
+    .summary { font-size: 0.95rem; }
+    .card-actions, .study-link { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+    .study-link a, a.study-link { font-weight: 600; text-decoration: none; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--control-border); }
+    .study-link a::before, a.study-link::before { content: "📚 "; }
+    .inline-form { background: none; border: 0; padding: 0; box-shadow: none; display: inline; }
+    button.checkin { padding: 6px 14px; border-radius: 999px; font-size: 0.95rem; }
+    .attended { margin: 0; font-weight: 600; }
+    .badges { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    .badge { display: grid; gap: 4px; justify-items: center; text-align: center; padding: 16px 12px; border-radius: 16px; border: 1px solid var(--border); background: var(--panel); }
+    .badge.earned { border-color: var(--accent-2); background: linear-gradient(160deg, color-mix(in srgb, var(--accent-2) 22%, var(--panel)), var(--panel)); box-shadow: 0 6px 20px color-mix(in srgb, var(--accent-2) 25%, transparent); }
+    .badge.locked .badge-emoji { filter: grayscale(1); opacity: .7; }
+    .badge-emoji { font-size: 2.2rem; line-height: 1; }
+    .badge-name { font-weight: 700; }
+    .badge-desc, .badge-progress { font-size: 0.85rem; color: var(--muted); }
+    .badge.earned .badge-progress { color: var(--text); font-weight: 600; }
+    .celebrate { font-size: 1.15rem; font-weight: 700; padding: 12px 16px; border-radius: 12px; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 20%, var(--panel)), color-mix(in srgb, var(--accent-2) 20%, var(--panel))); border: 1px solid var(--accent-2); }
+    .ideas li::marker { color: var(--accent-2); font-weight: 700; }
+    @media (prefers-reduced-motion: reduce) { .card, nav a { transition: none; } .results > .card:hover { transform: none; } }
     button.secondary { background: transparent; color: var(--text); border: 1px solid var(--control-border); }
   </style>
 </head>
 <body>
   <a class="skip" href="#${escapeHtml(page.skipTarget)}">Skip to main content</a>
   <header>
-    <h1>kube<span>compass</span></h1>
+    <h1><span class="logo" aria-hidden="true">🧭</span> kube<span>compass</span></h1>
     <nav aria-label="Main">${navLink("talks", "/", "Talks")}${navLink("ask", "/ask", "Ask")}${navLink("people", "/people", "Hallway track")}</nav>
     <p class="tagline">${escapeHtml(page.tagline)}</p>
   </header>

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Client, estypes } from "@elastic/elasticsearch";
 import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
+import type { AttendedTalk } from "./badges.js";
 import { redactIds } from "./redact.js";
 
 export const MAX_NAME_LENGTH = 60;
@@ -24,15 +25,21 @@ export interface Attendee extends AttendeeInput {
   created: string;
   /** Demo profiles seeded for the hackathon, labelled as such in the UI. */
   sample: boolean;
+  /** Talks checked in to, which earn badges. Missing on profiles created before badges. */
+  attended?: AttendedTalk[];
 }
 
 /** Another attendee as shown in someone's matches: no id, so nobody can open or delete it. */
-export type AttendeeMatch = Omit<Attendee, "id" | "created">;
+export type AttendeeMatch = Omit<Attendee, "id" | "created" | "attended">;
+
+export type CheckInResult = "checked_in" | "already" | "not_found" | "sample";
 
 export interface PeopleBackend {
   createAttendee(input: AttendeeInput): Promise<Attendee>;
   getAttendee(id: string): Promise<Attendee | null>;
   deleteAttendee(id: string): Promise<boolean>;
+  /** Adds a talk to the attendee's check-ins. Sample profiles can't check in. */
+  checkIn(id: string, talk: AttendedTalk): Promise<CheckInResult>;
   findMatches(attendee: Attendee): Promise<AttendeeMatch[]>;
 }
 
@@ -199,6 +206,42 @@ export function createPeopleBackend(es: Client, index: string): PeopleBackend {
         } catch (error) {
           if (isNotFound(error)) {
             return false;
+          }
+          throw error;
+        }
+      });
+    },
+
+    async checkIn(id, talk) {
+      if (!isAttendeeId(id)) {
+        return "not_found";
+      }
+      return traced("check in", async () => {
+        try {
+          const existing = await es.get<Attendee>({ index, id, _source_includes: ["sample"] }, UNTRACED);
+          if (existing._source?.sample) {
+            return "sample";
+          }
+          // The duplicate check runs inside the update, atomically per document,
+          // so two quick clicks can't add the same talk twice; a repeat is a noop.
+          const response = await es.update(
+            {
+              index,
+              id,
+              // A concurrent check-in bumps the version; retrying re-runs the script, which then sees the talk.
+              retry_on_conflict: 3,
+              script: {
+                source:
+                  "if (ctx._source.attended == null) { ctx._source.attended = []; } for (t in ctx._source.attended) { if (t.id == params.talk.id) { ctx.op = 'noop'; return; } } ctx._source.attended.add(params.talk)",
+                params: { talk },
+              },
+            },
+            UNTRACED,
+          );
+          return response.result === "noop" ? "already" : "checked_in";
+        } catch (error) {
+          if ((error as { meta?: { statusCode?: number } } | null)?.meta?.statusCode === 404) {
+            return "not_found";
           }
           throw error;
         }
