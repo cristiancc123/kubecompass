@@ -59,4 +59,21 @@ describe("loadConfig", () => {
       );
     }
   });
+
+  it("trims pasted whitespace and rejects malformed URLs without echoing them", () => {
+    const config = loadConfig({
+      ELASTICSEARCH_URL: " https://example.es.cloud:443\n",
+      ELASTICSEARCH_API_KEY: "key==\r\n",
+    });
+    expect(config.elasticsearchUrl).toBe("https://example.es.cloud:443");
+    expect(config.elasticsearchApiKey).toBe("key==");
+    expect(() => loadConfig({ ...env, ELASTICSEARCH_URL: "PEGA_AQUI" })).toThrow(
+      "ELASTICSEARCH_URL is not a valid URL",
+    );
+    expect(() => loadConfig({ ...env, ELASTICSEARCH_URL: "ftp://example" })).toThrow("must be an http or https URL");
+    expect(() => loadConfig({ ...env, DASH0_OTLP_ENDPOINT: "secret-token", DASH0_AUTH_TOKEN: "t" })).toThrow(
+      /^DASH0_OTLP_ENDPOINT is not a valid URL$/,
+    );
+    expect(() => loadConfig({ ...env, ELASTICSEARCH_API_KEY: "  " })).toThrow("Missing required environment variable");
+  });
 });

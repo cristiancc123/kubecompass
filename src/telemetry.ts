@@ -1,3 +1,4 @@
+import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-proto";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-proto";
@@ -23,6 +24,9 @@ export function startTelemetry(config: Config): () => Promise<void> {
   if (!telemetry) {
     return async () => {};
   }
+  // Exporters report failures, such as Dash0 rejecting the token, through
+  // diag. Without a logger they fail silently and telemetry just goes missing.
+  diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.ERROR);
   const headers: Record<string, string> = { Authorization: `Bearer ${telemetry.authToken}` };
   if (telemetry.dataset) {
     headers["Dash0-Dataset"] = telemetry.dataset;

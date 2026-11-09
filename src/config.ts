@@ -44,38 +44,70 @@ function positiveInt(env: NodeJS.ProcessEnv, name: string, fallback: number): nu
   return value;
 }
 
+/**
+ * Values pasted into a Secret often carry a trailing newline or spaces, which
+ * break URLs and API keys in ways that only show up as failed requests later.
+ */
+function read(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return env[name]?.trim() || undefined;
+}
+
 function required(env: NodeJS.ProcessEnv, name: string): string {
-  const value = env[name];
+  const value = read(env, name);
   if (!value) {
     throw new Error(`Missing required environment variable ${name}`);
   }
   return value;
 }
 
+/** Fails at startup with the variable's name, never its value, which may hold credentials. */
+function httpUrl(name: string, value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${name} is not a valid URL`);
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error(`${name} must be an http or https URL`);
+  }
+  return value;
+}
+
 function telemetryConfig(env: NodeJS.ProcessEnv): TelemetryConfig | undefined {
-  const otlpEndpoint = env.DASH0_OTLP_ENDPOINT;
-  const authToken = env.DASH0_AUTH_TOKEN;
+  const otlpEndpoint = read(env, "DASH0_OTLP_ENDPOINT");
+  const authToken = read(env, "DASH0_AUTH_TOKEN");
   if (!otlpEndpoint || !authToken) {
     return undefined;
   }
-  return { otlpEndpoint: otlpEndpoint.replace(/\/+$/, ""), authToken, dataset: env.DASH0_DATASET || undefined };
+  return {
+    otlpEndpoint: httpUrl("DASH0_OTLP_ENDPOINT", otlpEndpoint).replace(/\/+$/, ""),
+    authToken,
+    dataset: read(env, "DASH0_DATASET"),
+  };
+}
+
+function askConfig(env: NodeJS.ProcessEnv): AskConfig | undefined {
+  const anthropicApiKey = read(env, "ANTHROPIC_API_KEY");
+  if (!anthropicApiKey) {
+    return undefined;
+  }
+  return {
+    anthropicApiKey,
+    model: read(env, "ASK_MODEL") ?? "claude-opus-5-5",
+    limitPerMinute: positiveInt(env, "ASK_LIMIT_PER_MINUTE", 20),
+  };
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     port: Number(env.PORT ?? 3000),
-    elasticsearchUrl: required(env, "ELASTICSEARCH_URL"),
+    elasticsearchUrl: httpUrl("ELASTICSEARCH_URL", required(env, "ELASTICSEARCH_URL")),
     elasticsearchApiKey: required(env, "ELASTICSEARCH_API_KEY"),
     sessionsIndex: env.SESSIONS_INDEX ?? "kubecon-sessions",
     attendeesIndex: env.ATTENDEES_INDEX ?? "kubecon-attendees",
     appVersion: env.APP_VERSION ?? "dev",
     telemetry: telemetryConfig(env),
-    ask: env.ANTHROPIC_API_KEY
-      ? {
-          anthropicApiKey: env.ANTHROPIC_API_KEY,
-          model: env.ASK_MODEL || "claude-opus-5-5",
-          limitPerMinute: positiveInt(env, "ASK_LIMIT_PER_MINUTE", 20),
-        }
-      : undefined,
+    ask: askConfig(env),
   };
 }

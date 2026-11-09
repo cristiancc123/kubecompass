@@ -81,7 +81,37 @@ describe("probes", () => {
     });
     const res = await createApp({ people: fakePeople(), search: backend }).request("/readyz");
     expect(res.status).toBe(503);
-    expect(await res.json()).toMatchObject({ status: "degraded", elasticsearch: "connection refused" });
+    expect(await res.json()).toEqual({ status: "degraded", elasticsearch: "unreachable" });
+  });
+
+  it("logs why readiness fails once per change, never in the response", async () => {
+    const error = Object.assign(new Error("security_exception: unable to authenticate"), { meta: { statusCode: 401 } });
+    let healthy = false;
+    const backend = fakeBackend({
+      ping: async () => {
+        if (!healthy) throw error;
+        return true;
+      },
+    });
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const infos = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const app = createApp({ people: fakePeople(), search: backend });
+      for (let i = 0; i < 3; i++) {
+        const res = await app.request("/readyz");
+        expect(await res.text()).not.toContain("security_exception");
+      }
+      expect(errors).toHaveBeenCalledTimes(1);
+      expect(errors).toHaveBeenCalledWith("readiness: Elasticsearch unreachable", error);
+      healthy = true;
+      await app.request("/readyz");
+      await app.request("/readyz");
+      expect(infos).toHaveBeenCalledTimes(1);
+      expect(infos).toHaveBeenCalledWith("readiness: Elasticsearch reachable");
+    } finally {
+      errors.mockRestore();
+      infos.mockRestore();
+    }
   });
 });
 

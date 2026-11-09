@@ -75,17 +75,36 @@ export function createApp(deps: AppDependencies): Hono {
 
   app.get("/healthz", (c) => c.json({ status: "ok", version: deps.version ?? "dev" }));
 
+  // The probe runs every few seconds, so only changes are logged: the first
+  // failure says why (a 401 means the API key is wrong), recovery says so too.
+  // The public response stays generic.
+  let lastReady: boolean | undefined;
   app.get("/readyz", async (c) => {
+    let failure: unknown;
     try {
-      const reachable = await deps.search.ping();
-      if (!reachable) {
-        return c.json({ status: "degraded", elasticsearch: "unreachable" }, 503);
+      if (!(await deps.search.ping())) {
+        failure = new Error("Elasticsearch ping returned false");
       }
-      return c.json({ status: "ok", elasticsearch: "reachable" });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return c.json({ status: "degraded", elasticsearch: message }, 503);
+      failure = error;
     }
+    const ready = failure === undefined;
+    if (ready !== lastReady) {
+      if (ready) {
+        log.info("readiness: Elasticsearch reachable");
+      } else {
+        const statusCode = (failure as { meta?: { statusCode?: number } }).meta?.statusCode;
+        log.error(
+          "readiness: Elasticsearch unreachable",
+          failure,
+          statusCode ? { "http.response.status_code": statusCode } : {},
+        );
+      }
+      lastReady = ready;
+    }
+    return ready
+      ? c.json({ status: "ok", elasticsearch: "reachable" })
+      : c.json({ status: "degraded", elasticsearch: "unreachable" }, 503);
   });
 
   app.get("/api/search", async (c) => {
