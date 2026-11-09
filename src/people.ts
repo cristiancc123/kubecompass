@@ -218,26 +218,27 @@ export function createPeopleBackend(es: Client, index: string): PeopleBackend {
       }
       return traced("check in", async () => {
         try {
-          const existing = await es.get<Attendee>({ index, id, _source_includes: ["sample", "attended"] }, UNTRACED);
+          const existing = await es.get<Attendee>({ index, id, _source_includes: ["sample"] }, UNTRACED);
           if (existing._source?.sample) {
             return "sample";
           }
-          if ((existing._source?.attended ?? []).some((t) => t.id === talk.id)) {
-            return "already";
-          }
-          await es.update(
+          // The duplicate check runs inside the update, atomically per document,
+          // so two quick clicks can't add the same talk twice; a repeat is a noop.
+          const response = await es.update(
             {
               index,
               id,
+              // A concurrent check-in bumps the version; retrying re-runs the script, which then sees the talk.
+              retry_on_conflict: 3,
               script: {
                 source:
-                  "if (ctx._source.attended == null) { ctx._source.attended = []; } ctx._source.attended.add(params.talk)",
+                  "if (ctx._source.attended == null) { ctx._source.attended = []; } for (t in ctx._source.attended) { if (t.id == params.talk.id) { ctx.op = 'noop'; return; } } ctx._source.attended.add(params.talk)",
                 params: { talk },
               },
             },
             UNTRACED,
           );
-          return "checked_in";
+          return response.result === "noop" ? "already" : "checked_in";
         } catch (error) {
           if ((error as { meta?: { statusCode?: number } } | null)?.meta?.statusCode === 404) {
             return "not_found";
