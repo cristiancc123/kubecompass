@@ -3,6 +3,7 @@ import { trace } from "@opentelemetry/api";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { renderAskPage } from "./ask-ui.js";
+import { computeBadges, newlyEarned, type AttendedTalk } from "./badges.js";
 import { MAX_QUESTION_LENGTH, type AskBackend } from "./ask.js";
 import { log } from "./log.js";
 import { renderPeopleForm, renderPeopleMessage, renderProfile } from "./people-ui.js";
@@ -10,6 +11,7 @@ import type { Readiness } from "./readiness.js";
 import { redactUrl } from "./redact.js";
 import { pickLanguage, pickLevel, renderStudyMessage, renderStudyPage } from "./study-ui.js";
 import type { StudyBackend } from "./study.js";
+import type { Session } from "./sessions.js";
 import { parseAttendeeInput, type PeopleBackend } from "./people.js";
 import { MAX_QUERY_LENGTH, type SearchBackend, type SearchQuery } from "./search.js";
 import { SERVICE_NAME } from "./telemetry.js";
@@ -25,6 +27,8 @@ export interface AppDependencies {
   askLimiter?: { tryAcquire(): boolean };
   /** Absent when no model is configured; the study page then says so. */
   study?: StudyBackend;
+  /** Sessions by schedule id, for check-ins. Absent means check-ins are off. */
+  sessions?: (id: string) => Promise<Session | null>;
   /** Reported by /healthz so a deploy can be matched to its image tag. */
   version?: string;
 }
@@ -254,8 +258,69 @@ export function createApp(deps: AppDependencies): Hono {
           return null;
         }),
     ]);
-    return c.html(renderProfile({ attendee, matches, talks, created: c.req.query("created") === "1" }));
+    // Only badge ids this attendee has actually earned are celebrated, whatever the query says.
+    const earnedIds = new Set((c.req.query("earned") ?? "").split(","));
+    const celebrate = computeBadges(attendee.attended ?? []).filter((b) => b.earned && earnedIds.has(b.id));
+    return c.html(
+      renderProfile({
+        attendee,
+        matches,
+        talks,
+        created: c.req.query("created") === "1",
+        checkedIn: c.req.query("checked") === "1",
+        celebrate,
+        checkInEnabled: deps.sessions !== undefined,
+      }),
+    );
   });
+
+  app.post(
+    "/people/:id/attend",
+    bodyLimit({ maxSize: MAX_FORM_BYTES, onError: (c) => c.html(renderPeopleMessage("That form is too large."), 413) }),
+    async (c) => {
+      if (!deps.sessions) {
+        return c.html(renderPeopleMessage("Check-ins are not available on this deployment."), 503);
+      }
+      const id = c.req.param("id");
+      const form = await c.req.parseBody();
+      try {
+        const attendee = await deps.people.getAttendee(id);
+        if (!attendee) {
+          return c.html(renderPeopleMessage("This profile doesn't exist, or it was deleted."), 404);
+        }
+        const session = await deps.sessions(String(form.session ?? ""));
+        if (!session) {
+          return c.html(renderPeopleMessage("That session doesn't exist."), 404);
+        }
+        const talk: AttendedTalk = {
+          id: session.id,
+          title: session.title,
+          track: session.track,
+          day: session.day,
+          venue: session.venue,
+        };
+        const result = await deps.people.checkIn(id, talk);
+        if (result === "sample") {
+          return c.html(
+            renderPeopleMessage("Sample profiles can't collect badges. Create your own profile to start."),
+            403,
+          );
+        }
+        if (result === "not_found") {
+          return c.html(renderPeopleMessage("This profile doesn't exist, or it was deleted."), 404);
+        }
+        const before = attendee.attended ?? [];
+        const after = result === "checked_in" ? [...before, talk] : before;
+        const earned = newlyEarned(before, after).map((b) => b.id);
+        const query = earned.length > 0 ? `checked=1&earned=${earned.join(",")}` : "checked=1";
+        // Post/redirect/get, back to the badges.
+        return c.redirect(`/people/${attendee.id}?${query}#badges`, 303);
+      } catch (error) {
+        log.error("check in failed", error);
+        return c.html(renderPeopleMessage("Checking in failed. Try again in a moment."), 502);
+      }
+    },
+  );
 
   app.post("/people/:id/delete", async (c) => {
     try {

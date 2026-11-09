@@ -6,6 +6,7 @@ import {
   type AttendeeInput,
   type AttendeeMatch,
 } from "./people.js";
+import { computeBadges, type Badge } from "./badges.js";
 import type { SessionHit } from "./search.js";
 import { escapeHtml, formatSlot, renderLayout, truncate } from "./ui.js";
 
@@ -67,12 +68,51 @@ function renderMatch(match: AttendeeMatch, index: number): string {
 </li>`;
 }
 
-function renderTalk(hit: SessionHit): string {
+function renderTalk(hit: SessionHit, attendee: Attendee, checkInEnabled: boolean): string {
+  const attended = (attendee.attended ?? []).some((t) => t.id === hit.id);
+  const action = attended
+    ? `<p class="attended"><span aria-hidden="true">✅</span> Attended</p>`
+    : checkInEnabled && !attendee.sample
+      ? `<form method="post" action="/people/${escapeHtml(attendee.id)}/attend" class="inline-form">
+    <input type="hidden" name="session" value="${escapeHtml(hit.id)}" />
+    <button type="submit" class="checkin">I attended<span class="visually-hidden">: ${escapeHtml(hit.title)}</span></button>
+  </form>`
+      : "";
   return `<li class="card">
   <h3><a href="${escapeHtml(hit.url)}" rel="noopener" target="_blank">${escapeHtml(hit.title)}</a></h3>
   <p class="meta"><time datetime="${escapeHtml(hit.start)}">${escapeHtml(formatSlot(hit.start, hit.end))}</time> · ${escapeHtml(hit.room || "Room to be announced")}</p>
-  <p class="study-link"><a href="/talks/${escapeHtml(hit.id)}/study">Study this talk<span class="visually-hidden">: ${escapeHtml(hit.title)}</span></a></p>
+  <div class="card-actions">
+    <a class="study-link" href="/talks/${escapeHtml(hit.id)}/study">Study this talk<span class="visually-hidden">: ${escapeHtml(hit.title)}</span></a>
+    ${action}
+  </div>
 </li>`;
+}
+
+function renderBadge(badge: Badge): string {
+  const state = badge.earned ? "earned" : "locked";
+  return `<li class="badge ${state}">
+  <span class="badge-emoji" aria-hidden="true">${badge.earned ? badge.emoji : "🔒"}</span>
+  <span class="badge-name">${escapeHtml(badge.name)}</span>
+  <span class="badge-desc">${escapeHtml(badge.description)}</span>
+  <span class="badge-progress">${badge.earned ? "Collected" : escapeHtml(badge.progress)}</span>
+</li>`;
+}
+
+/** The collection: earned badges first, then the ones still to chase. */
+function renderBadges(attendee: Attendee, celebrate: Badge[]): string {
+  if (attendee.sample) {
+    return `<p class="notice">Sample profiles don't collect badges. <a href="/people">Create your profile</a> to start your collection.</p>`;
+  }
+  const badges = computeBadges(attendee.attended ?? []);
+  const earned = badges.filter((b) => b.earned);
+  const ordered = [...earned, ...badges.filter((b) => !b.earned)];
+  const party =
+    celebrate.length > 0
+      ? `<p class="celebrate" role="status"><span aria-hidden="true">🎉</span> New badge${celebrate.length > 1 ? "s" : ""}: ${celebrate.map((b) => escapeHtml(b.name)).join(", ")}!</p>`
+      : "";
+  return `${party}
+      <p class="meta">${earned.length} of ${badges.length} collected · ${(attendee.attended ?? []).length} ${(attendee.attended ?? []).length === 1 ? "talk" : "talks"} attended. Check in to talks below to earn more.</p>
+      <ul class="badges">${ordered.map(renderBadge).join("\n")}</ul>`;
 }
 
 const sampleNote = `<p class="notice">This is a sample profile seeded for the demo. Create your own to get matched.</p>
@@ -93,10 +133,23 @@ export interface ProfileModel {
   talks: SessionHit[] | null;
   /** True right after sign-up, to remind them to keep the link. */
   created?: boolean;
+  /** True right after a check-in. */
+  checkedIn?: boolean;
+  /** Badges the last check-in earned. */
+  celebrate?: Badge[];
+  checkInEnabled?: boolean;
 }
 
 /** An attendee's private page: their matches, talks for them, and a delete button. */
-export function renderProfile({ attendee, matches, talks, created }: ProfileModel): string {
+export function renderProfile({
+  attendee,
+  matches,
+  talks,
+  created,
+  checkedIn,
+  celebrate = [],
+  checkInEnabled = false,
+}: ProfileModel): string {
   const welcome = created
     ? `<p class="notice" role="status">Your profile is live. Bookmark this page: its link is the only way back to it.</p>`
     : "";
@@ -111,12 +164,17 @@ export function renderProfile({ attendee, matches, talks, created }: ProfileMode
       ? `<p class="error" role="alert">Talk suggestions are temporarily unavailable.</p>`
       : talks.length === 0
         ? `<p class="empty">No talks found for these interests.</p>`
-        : `<ol class="results">${talks.map(renderTalk).join("\n")}</ol>`;
+        : `<ol class="results">${talks.map((hit) => renderTalk(hit, attendee, checkInEnabled)).join("\n")}</ol>`;
 
   const content = `<section id="profile" tabindex="-1" aria-labelledby="profile-title">
       ${welcome}
       <h2 class="section" id="profile-title">Hi, ${escapeHtml(attendee.name)}</h2>
       <p class="desc">${escapeHtml(attendee.interests)}</p>
+    </section>
+    <section id="badges" aria-labelledby="badges-title">
+      <h2 class="section" id="badges-title"><span aria-hidden="true">🏅</span> Your badges</h2>
+      ${checkedIn && celebrate.length === 0 ? `<p class="notice" role="status">Checked in. Keep going!</p>` : ""}
+      ${renderBadges(attendee, celebrate)}
     </section>
     <section aria-labelledby="matches-title">
       <h2 class="section" id="matches-title">People to meet</h2>

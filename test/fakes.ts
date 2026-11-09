@@ -30,6 +30,7 @@ export function fakePeople(overrides: Partial<PeopleBackend> = {}): PeopleBacken
     createAttendee: async (input) => sampleAttendee({ ...input }),
     getAttendee: async (id) => (id === SAMPLE_ID ? sampleAttendee() : null),
     deleteAttendee: async (id) => id === SAMPLE_ID,
+    checkIn: async (id) => (id === SAMPLE_ID ? "checked_in" : "not_found"),
     findMatches: async () => [sampleMatch],
     ...overrides,
   };
